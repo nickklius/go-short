@@ -1,7 +1,6 @@
 package app
 
 import (
-	"fmt"
 	"io"
 	"math/rand"
 	"net/http"
@@ -62,8 +61,8 @@ func URLHandler(w http.ResponseWriter, r *http.Request) {
 
 		if len(b) > 0 {
 			url := sh.shortenURL(string(b))
-			fmt.Println(sh.storage)
-			w.Write([]byte(url))
+			w.WriteHeader(http.StatusCreated)
+			w.Write([]byte("http://localhost:8080/" + url))
 		} else {
 			w.WriteHeader(http.StatusBadRequest)
 		}
