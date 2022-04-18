@@ -46,7 +46,7 @@ func URLHandler(w http.ResponseWriter, r *http.Request) {
 		url := r.URL.Path[1:]
 		switch sh.checkURL(url) {
 		case true:
-			http.Redirect(w, r, sh.storage[url], http.StatusMovedPermanently)
+			http.Redirect(w, r, sh.storage[url], http.StatusTemporaryRedirect)
 		default:
 			w.WriteHeader(http.StatusBadRequest)
 		}
