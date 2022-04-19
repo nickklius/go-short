@@ -1,4 +1,4 @@
-package app
+package handlers
 
 import (
 	"io"
@@ -6,7 +6,7 @@ import (
 	"net/http"
 )
 
-const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ123456789"
+const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
 
 var sh = URLShortener{storage: map[string]string{}}
 
@@ -33,6 +33,7 @@ func (u *URLShortener) checkURL(url string) bool {
 	}
 	return false
 }
+
 func (u *URLShortener) shortenURL(url string) string {
 	short := u.generateKey(5)
 	u.storage[short] = url
@@ -40,7 +41,8 @@ func (u *URLShortener) shortenURL(url string) string {
 }
 
 func URLHandler(w http.ResponseWriter, r *http.Request) {
-	// TODO: make post method handler
+	// TODO: recreate r.Method choose mechanism with switch, make a default case with http.Error
+	// TODO: validate URL with URLShortener method
 
 	if r.Method == http.MethodGet {
 		url := r.URL.Path[1:]
