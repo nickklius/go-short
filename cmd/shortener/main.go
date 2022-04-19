@@ -1,13 +1,13 @@
 package main
 
 import (
-	"github.com/nickklius/go-short/internal/app"
+	"github.com/nickklius/go-short/internal/handlers"
 	"net/http"
 )
 
 func main() {
 
-	http.HandleFunc("/", app.URLHandler)
+	http.HandleFunc("/", handlers.URLHandler)
 	server := &http.Server{
 		Addr: "localhost:8080",
 	}
