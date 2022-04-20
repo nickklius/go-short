@@ -6,7 +6,13 @@ import (
 	"net/http"
 )
 
-const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
+const (
+	host    = "localhost"
+	letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
+	port    = "8080"
+	schema  = "http"
+	urllen  = 5
+)
 
 var sh = URLShortener{storage: map[string]string{}}
 
@@ -35,38 +41,47 @@ func (u *URLShortener) checkURL(url string) bool {
 }
 
 func (u *URLShortener) shortenURL(url string) string {
-	short := u.generateKey(5)
+	short := u.generateKey(urllen)
 	u.storage[short] = url
 	return short
 }
 
-func URLHandler(w http.ResponseWriter, r *http.Request) {
-	// TODO: recreate r.Method choose mechanism with switch, make a default case with http.Error
-	// TODO: validate URL with URLShortener method
-
-	if r.Method == http.MethodGet {
-		url := r.URL.Path[1:]
-		switch sh.checkURL(url) {
-		case true:
-			http.Redirect(w, r, sh.storage[url], http.StatusTemporaryRedirect)
-		default:
-			w.WriteHeader(http.StatusBadRequest)
-		}
+func ShortenHandler(w http.ResponseWriter, r *http.Request) {
+	b, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
 	}
 
-	if r.Method == http.MethodPost {
-		b, err := io.ReadAll(r.Body)
-		if err != nil {
-			http.Error(w, err.Error(), 500)
-			return
-		}
+	if len(b) > 0 {
+		url := sh.shortenURL(string(b))
+		w.Header().Set("Content-Type", "plain/text")
+		w.WriteHeader(http.StatusCreated)
+		w.Write([]byte(schema + "://" + host + ":" + port + "/" + url))
+	} else {
+		w.WriteHeader(http.StatusBadRequest)
+	}
+}
 
-		if len(b) > 0 {
-			url := sh.shortenURL(string(b))
-			w.WriteHeader(http.StatusCreated)
-			w.Write([]byte("http://localhost:8080/" + url))
-		} else {
-			w.WriteHeader(http.StatusBadRequest)
-		}
+func RetrieveHandler(w http.ResponseWriter, r *http.Request) {
+	url := r.URL.Path[1:]
+	switch sh.checkURL(url) {
+	case true:
+		http.Redirect(w, r, sh.storage[url], http.StatusTemporaryRedirect)
+	default:
+		w.WriteHeader(http.StatusBadRequest)
+	}
+}
+
+func URLHandler(w http.ResponseWriter, r *http.Request) {
+	// TODO: validate URL with URLShortener method
+
+	switch r.Method {
+	case http.MethodGet:
+		RetrieveHandler(w, r)
+	case http.MethodPost:
+		ShortenHandler(w, r)
+	default:
+		http.Error(w, "Allowed only GET and POST methods", http.StatusBadRequest)
 	}
 }
