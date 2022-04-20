@@ -64,6 +64,8 @@ func TestURLHandler(t *testing.T) {
 			require.NotNil(t, g.Header().Get("Location"))
 			assert.Equal(t, tt.want.url, g.Header().Get("Location"))
 
+			err = rsGet.Body.Close()
+			require.NoError(t, err)
 		})
 	}
 }
