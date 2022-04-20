@@ -11,6 +11,7 @@ const (
 	letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
 	port    = "8080"
 	schema  = "http"
+	urllen  = 5
 )
 
 var sh = URLShortener{storage: map[string]string{}}
@@ -40,12 +41,12 @@ func (u *URLShortener) checkURL(url string) bool {
 }
 
 func (u *URLShortener) shortenURL(url string) string {
-	short := u.generateKey(5)
+	short := u.generateKey(urllen)
 	u.storage[short] = url
 	return short
 }
 
-func shortenHandler(w http.ResponseWriter, r *http.Request) {
+func ShortenHandler(w http.ResponseWriter, r *http.Request) {
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
@@ -54,6 +55,7 @@ func shortenHandler(w http.ResponseWriter, r *http.Request) {
 
 	if len(b) > 0 {
 		url := sh.shortenURL(string(b))
+		w.Header().Set("Content-Type", "plain/text")
 		w.WriteHeader(http.StatusCreated)
 		w.Write([]byte(schema + "://" + host + ":" + port + "/" + url))
 	} else {
@@ -61,7 +63,7 @@ func shortenHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func retrieveHandler(w http.ResponseWriter, r *http.Request) {
+func RetrieveHandler(w http.ResponseWriter, r *http.Request) {
 	url := r.URL.Path[1:]
 	switch sh.checkURL(url) {
 	case true:
@@ -76,9 +78,9 @@ func URLHandler(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodGet:
-		retrieveHandler(w, r)
+		RetrieveHandler(w, r)
 	case http.MethodPost:
-		shortenHandler(w, r)
+		ShortenHandler(w, r)
 	default:
 		http.Error(w, "Allowed only GET and POST methods", http.StatusBadRequest)
 	}
