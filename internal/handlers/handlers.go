@@ -1,36 +1,22 @@
 package handlers
 
 import (
+	"github.com/nickklius/go-short/internal/utils"
 	"io"
-	"math/rand"
 	"net/http"
 )
 
 const (
-	host    = "localhost"
-	letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
-	port    = "8080"
-	schema  = "http"
-	urllen  = 5
+	host   = "localhost"
+	port   = "8080"
+	schema = "http"
+	urllen = 5
 )
 
 var sh = URLShortener{storage: map[string]string{}}
 
 type URLShortener struct {
 	storage map[string]string
-}
-
-func (u *URLShortener) generateKey(n int) string {
-	b := make([]byte, n)
-	for {
-		for i := range b {
-			b[i] = letters[rand.Intn(len(letters))]
-		}
-		if _, ok := u.storage[string(b)]; !ok {
-			break
-		}
-	}
-	return string(b)
 }
 
 func (u *URLShortener) checkURL(url string) bool {
@@ -41,7 +27,13 @@ func (u *URLShortener) checkURL(url string) bool {
 }
 
 func (u *URLShortener) shortenURL(url string) string {
-	short := u.generateKey(urllen)
+	var short string
+	for {
+		short = utils.GenerateKey(urllen)
+		if _, ok := u.storage[short]; !ok {
+			break
+		}
+	}
 	u.storage[short] = url
 	return short
 }
