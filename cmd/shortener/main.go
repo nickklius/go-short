@@ -20,9 +20,10 @@ func main() {
 	r.Use(middleware.Recoverer)
 
 	r.Route("/", func(r chi.Router) {
-		r.Post("/", handlers.ShortenHandler(URLStorage))
 		r.Get("/", handlers.RetrieveHandler(URLStorage))
 		r.Get("/{id}", handlers.RetrieveHandler(URLStorage))
+
+		r.Post("/", handlers.ShortenHandler(URLStorage))
 	})
 
 	log.Fatal(http.ListenAndServe(":8080", r))
