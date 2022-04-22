@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"github.com/nickklius/go-short/internal/utils"
+	"github.com/nickklius/go-short/internal/storage"
 	"io"
 	"net/http"
 )
@@ -10,57 +10,44 @@ const (
 	host   = "localhost"
 	port   = "8080"
 	schema = "http"
-	urllen = 5
 )
 
-var sh = URLShortener{storage: map[string]string{}}
+func ShortenHandler(URLStorage storage.Repository) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		b, err := io.ReadAll(r.Body)
+		defer r.Body.Close()
 
-type URLShortener struct {
-	storage map[string]string
-}
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 
-func (u *URLShortener) checkURL(url string) bool {
-	if _, ok := u.storage[url]; ok {
-		return true
-	}
-	return false
-}
+		if len(b) > 0 {
+			shortURL := storage.CreateShortURL(URLStorage, string(b))
+			w.WriteHeader(http.StatusCreated)
 
-func (u *URLShortener) shortenURL(url string) string {
-	var short string
-	for {
-		short = utils.GenerateKey(urllen)
-		if _, ok := u.storage[short]; !ok {
-			break
+			_, err = w.Write([]byte(schema + "://" + host + ":" + port + "/" + shortURL))
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+			return
 		}
 	}
-	u.storage[short] = url
-	return short
 }
 
-func ShortenHandler(w http.ResponseWriter, r *http.Request) {
-	b, err := io.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
+func RetrieveHandler(URLStorage storage.Repository) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		shortURL := r.URL.Path[1:]
+		longURL := storage.RetrieveURL(URLStorage, shortURL)
 
-	if len(b) > 0 {
-		url := sh.shortenURL(string(b))
-		w.Header().Set("Content-Type", "plain/text")
-		w.WriteHeader(http.StatusCreated)
-		w.Write([]byte(schema + "://" + host + ":" + port + "/" + url))
-	} else {
-		w.WriteHeader(http.StatusBadRequest)
-	}
-}
-
-func RetrieveHandler(w http.ResponseWriter, r *http.Request) {
-	url := r.URL.Path[1:]
-	switch sh.checkURL(url) {
-	case true:
-		http.Redirect(w, r, sh.storage[url], http.StatusTemporaryRedirect)
-	default:
-		w.WriteHeader(http.StatusBadRequest)
+		switch longURL != "" {
+		case true:
+			http.Redirect(w, r, longURL, http.StatusTemporaryRedirect)
+		default:
+			http.Error(w, "URL not found", http.StatusBadRequest)
+		}
 	}
 }

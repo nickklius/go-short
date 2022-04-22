@@ -2,10 +2,13 @@ package utils
 
 import "math/rand"
 
-const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
+const (
+	keyLength = 5
+	letters   = "0123456789abcdefghijklmnopqrstuvwxyz"
+)
 
-func GenerateKey(n int) string {
-	b := make([]byte, n)
+func GenerateKey() string {
+	b := make([]byte, keyLength)
 	for i := range b {
 		b[i] = letters[rand.Intn(len(letters))]
 	}
