@@ -64,16 +64,3 @@ func RetrieveHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 	}
 }
-
-func URLHandler(w http.ResponseWriter, r *http.Request) {
-	// TODO: validate URL with URLShortener method
-
-	switch r.Method {
-	case http.MethodGet:
-		RetrieveHandler(w, r)
-	case http.MethodPost:
-		ShortenHandler(w, r)
-	default:
-		http.Error(w, "Allowed only GET and POST methods", http.StatusBadRequest)
-	}
-}
