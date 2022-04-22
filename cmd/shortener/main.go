@@ -1,19 +1,30 @@
 package main
 
 import (
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/nickklius/go-short/internal/handlers"
+	"github.com/nickklius/go-short/internal/storage"
+	"log"
 	"net/http"
 )
 
 func main() {
+	var URLStorage storage.Repository = &storage.MapURLStorage{Storage: map[string]string{}}
 
-	http.HandleFunc("/", handlers.URLHandler)
-	server := &http.Server{
-		Addr: "localhost:8080",
-	}
-	err := server.ListenAndServe()
-	if err != nil {
-		panic(err)
-	}
+	r := chi.NewRouter()
 
+	r.Use(middleware.RequestID)
+	r.Use(middleware.RealIP)
+	r.Use(middleware.Logger)
+	r.Use(middleware.Recoverer)
+
+	r.Route("/", func(r chi.Router) {
+		r.Get("/", handlers.RetrieveHandler(URLStorage))
+		r.Get("/{id}", handlers.RetrieveHandler(URLStorage))
+
+		r.Post("/", handlers.ShortenHandler(URLStorage))
+	})
+
+	log.Fatal(http.ListenAndServe(":8080", r))
 }

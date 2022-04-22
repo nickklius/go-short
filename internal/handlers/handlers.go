@@ -1,87 +1,53 @@
 package handlers
 
 import (
+	"github.com/nickklius/go-short/internal/storage"
 	"io"
-	"math/rand"
 	"net/http"
 )
 
 const (
-	host    = "localhost"
-	letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
-	port    = "8080"
-	schema  = "http"
-	urllen  = 5
+	host   = "localhost"
+	port   = "8080"
+	schema = "http"
 )
 
-var sh = URLShortener{storage: map[string]string{}}
+func ShortenHandler(URLStorage storage.Repository) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		b, err := io.ReadAll(r.Body)
+		defer r.Body.Close()
 
-type URLShortener struct {
-	storage map[string]string
-}
-
-func (u *URLShortener) generateKey(n int) string {
-	b := make([]byte, n)
-	for {
-		for i := range b {
-			b[i] = letters[rand.Intn(len(letters))]
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
-		if _, ok := u.storage[string(b)]; !ok {
-			break
+
+		if len(b) > 0 {
+			shortURL := storage.CreateShortURL(URLStorage, string(b))
+			w.WriteHeader(http.StatusCreated)
+
+			_, err = w.Write([]byte(schema + "://" + host + ":" + port + "/" + shortURL))
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+			return
 		}
 	}
-	return string(b)
 }
 
-func (u *URLShortener) checkURL(url string) bool {
-	if _, ok := u.storage[url]; ok {
-		return true
-	}
-	return false
-}
+func RetrieveHandler(URLStorage storage.Repository) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		shortURL := r.URL.Path[1:]
+		longURL := storage.RetrieveURL(URLStorage, shortURL)
 
-func (u *URLShortener) shortenURL(url string) string {
-	short := u.generateKey(urllen)
-	u.storage[short] = url
-	return short
-}
-
-func ShortenHandler(w http.ResponseWriter, r *http.Request) {
-	b, err := io.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
-
-	if len(b) > 0 {
-		url := sh.shortenURL(string(b))
-		w.Header().Set("Content-Type", "plain/text")
-		w.WriteHeader(http.StatusCreated)
-		w.Write([]byte(schema + "://" + host + ":" + port + "/" + url))
-	} else {
-		w.WriteHeader(http.StatusBadRequest)
-	}
-}
-
-func RetrieveHandler(w http.ResponseWriter, r *http.Request) {
-	url := r.URL.Path[1:]
-	switch sh.checkURL(url) {
-	case true:
-		http.Redirect(w, r, sh.storage[url], http.StatusTemporaryRedirect)
-	default:
-		w.WriteHeader(http.StatusBadRequest)
-	}
-}
-
-func URLHandler(w http.ResponseWriter, r *http.Request) {
-	// TODO: validate URL with URLShortener method
-
-	switch r.Method {
-	case http.MethodGet:
-		RetrieveHandler(w, r)
-	case http.MethodPost:
-		ShortenHandler(w, r)
-	default:
-		http.Error(w, "Allowed only GET and POST methods", http.StatusBadRequest)
+		switch longURL != "" {
+		case true:
+			http.Redirect(w, r, longURL, http.StatusTemporaryRedirect)
+		default:
+			http.Error(w, "URL not found", http.StatusBadRequest)
+		}
 	}
 }
