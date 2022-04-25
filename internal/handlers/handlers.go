@@ -4,15 +4,10 @@ import (
 	"context"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/nickklius/go-short/internal/config"
 	"github.com/nickklius/go-short/internal/storage"
 	"io"
 	"net/http"
-)
-
-const (
-	host   = "localhost"
-	port   = "8080"
-	schema = "http"
 )
 
 func ServiceRouter(repo storage.Repository) chi.Router {
@@ -49,7 +44,7 @@ func ShortenHandler(URLStorage storage.Repository) http.HandlerFunc {
 			}
 			w.WriteHeader(http.StatusCreated)
 
-			_, err = w.Write([]byte(schema + "://" + host + ":" + port + "/" + shortURL))
+			_, err = w.Write([]byte(config.ServiceURL + "/" + shortURL))
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return

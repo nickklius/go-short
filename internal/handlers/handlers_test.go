@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"github.com/nickklius/go-short/internal/config"
 	"github.com/nickklius/go-short/internal/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -100,7 +101,7 @@ func TestShortenHandler(t *testing.T) {
 			body: "https://ya.ru",
 			want: want{
 				statusCode:    201,
-				lenShortenURL: len("http://localhost:8080") + 6,
+				lenShortenURL: len(config.ServiceURL+"/") + config.KeyLength,
 			},
 		},
 	}
