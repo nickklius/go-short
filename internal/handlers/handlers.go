@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"github.com/nickklius/go-short/internal/storage"
 	"io"
 	"net/http"
@@ -13,6 +14,7 @@ const (
 )
 
 func ShortenHandler(URLStorage storage.Repository) http.HandlerFunc {
+	ctx := context.Background()
 	return func(w http.ResponseWriter, r *http.Request) {
 		b, err := io.ReadAll(r.Body)
 		defer r.Body.Close()
@@ -23,7 +25,11 @@ func ShortenHandler(URLStorage storage.Repository) http.HandlerFunc {
 		}
 
 		if len(b) > 0 {
-			shortURL := storage.CreateShortURL(URLStorage, string(b))
+			shortURL, err := storage.CreateShortURL(URLStorage, ctx, string(b))
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 			w.WriteHeader(http.StatusCreated)
 
 			_, err = w.Write([]byte(schema + "://" + host + ":" + port + "/" + shortURL))
@@ -39,9 +45,13 @@ func ShortenHandler(URLStorage storage.Repository) http.HandlerFunc {
 }
 
 func RetrieveHandler(URLStorage storage.Repository) http.HandlerFunc {
+	ctx := context.Background()
 	return func(w http.ResponseWriter, r *http.Request) {
 		shortURL := r.URL.Path[1:]
-		longURL := storage.RetrieveURL(URLStorage, shortURL)
+		longURL, err := storage.RetrieveURL(URLStorage, ctx, shortURL)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 
 		switch longURL != "" {
 		case true:
