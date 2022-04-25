@@ -1,16 +1,30 @@
 package handlers
 
 import (
+	"context"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+	"github.com/nickklius/go-short/internal/config"
 	"github.com/nickklius/go-short/internal/storage"
 	"io"
 	"net/http"
 )
 
-const (
-	host   = "localhost"
-	port   = "8080"
-	schema = "http"
-)
+func ServiceRouter(repo storage.Repository) chi.Router {
+	r := chi.NewRouter()
+
+	r.Use(middleware.RequestID)
+	r.Use(middleware.RealIP)
+	r.Use(middleware.Logger)
+	r.Use(middleware.Recoverer)
+
+	r.Route("/", func(r chi.Router) {
+		r.Get("/{id}", RetrieveHandler(repo))
+		r.Post("/", ShortenHandler(repo))
+	})
+
+	return r
+}
 
 func ShortenHandler(URLStorage storage.Repository) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -23,10 +37,14 @@ func ShortenHandler(URLStorage storage.Repository) http.HandlerFunc {
 		}
 
 		if len(b) > 0 {
-			shortURL := storage.CreateShortURL(URLStorage, string(b))
+			shortURL, err := storage.CreateShortURL(URLStorage, context.Background(), string(b))
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 			w.WriteHeader(http.StatusCreated)
 
-			_, err = w.Write([]byte(schema + "://" + host + ":" + port + "/" + shortURL))
+			_, err = w.Write([]byte(config.ServiceURL + "/" + shortURL))
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
@@ -40,13 +58,16 @@ func ShortenHandler(URLStorage storage.Repository) http.HandlerFunc {
 
 func RetrieveHandler(URLStorage storage.Repository) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		shortURL := r.URL.Path[1:]
-		longURL := storage.RetrieveURL(URLStorage, shortURL)
+		shortURL := chi.URLParam(r, "id")
+		longURL, err := storage.RetrieveURL(URLStorage, context.Background(), shortURL)
 
-		switch longURL != "" {
-		case true:
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+
+		if longURL != "" {
 			http.Redirect(w, r, longURL, http.StatusTemporaryRedirect)
-		default:
+		} else {
 			http.Error(w, "URL not found", http.StatusBadRequest)
 		}
 	}
