@@ -80,6 +80,8 @@ func TestRetrieveHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			resp, _ := testRequest(t, ts, http.MethodGet, tt.path, nil)
+			defer resp.Body.Close()
+
 			assert.Equal(t, tt.want.statusCode, resp.StatusCode)
 		})
 	}
@@ -112,6 +114,8 @@ func TestShortenHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			resp, resultBody := testRequest(t, ts, http.MethodPost, "/", bytes.NewBuffer([]byte(tt.body)))
+			defer resp.Body.Close()
+
 			assert.Equal(t, tt.want.statusCode, resp.StatusCode)
 			assert.Equal(t, tt.want.lenShortenURL, len(resultBody))
 		})
