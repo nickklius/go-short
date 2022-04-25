@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"context"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/nickklius/go-short/internal/storage"
 	"io"
 	"net/http"
@@ -12,6 +14,22 @@ const (
 	port   = "8080"
 	schema = "http"
 )
+
+func ServiceRouter(repo storage.Repository) chi.Router {
+	r := chi.NewRouter()
+
+	r.Use(middleware.RequestID)
+	r.Use(middleware.RealIP)
+	r.Use(middleware.Logger)
+	r.Use(middleware.Recoverer)
+
+	r.Route("/", func(r chi.Router) {
+		r.Get("/{id}", RetrieveHandler(repo))
+		r.Post("/", ShortenHandler(repo))
+	})
+
+	return r
+}
 
 func ShortenHandler(URLStorage storage.Repository) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -45,8 +63,9 @@ func ShortenHandler(URLStorage storage.Repository) http.HandlerFunc {
 
 func RetrieveHandler(URLStorage storage.Repository) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		shortURL := r.URL.Path[1:]
+		shortURL := chi.URLParam(r, "id")
 		longURL, err := storage.RetrieveURL(URLStorage, context.Background(), shortURL)
+
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
