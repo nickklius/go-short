@@ -140,7 +140,7 @@ func TestShortenJsonHandler(t *testing.T) {
 			want: want{
 				statusCode:   201,
 				contentType:  "application/json; charset=utf-8",
-				responseBody: "{\"result\":\"http://localhost:8080/6p84o\"}",
+				responseBody: "{\"result\":\"http://localhost:8080/e7ut4\"}",
 			},
 		},
 		{
