@@ -121,3 +121,50 @@ func TestShortenHandler(t *testing.T) {
 		})
 	}
 }
+
+func TestShortenJsonHandler(t *testing.T) {
+	type want struct {
+		statusCode   int
+		contentType  string
+		responseBody string
+	}
+
+	tests := []struct {
+		name string
+		body string
+		want want
+	}{
+		{
+			name: "success: URL shorten json, response status code 201",
+			body: "{\"url\":\"https://ya.ru/\"}",
+			want: want{
+				statusCode:   201,
+				contentType:  "application/json; charset=utf-8",
+				responseBody: "{\"result\":\"http://localhost:8080/e7ut4\"}",
+			},
+		},
+		{
+			name: "fail: wrong request body for shorten json handler",
+			body: "{\"_\":\"https://ya.ru/\"}",
+			want: want{
+				statusCode:   400,
+				contentType:  "",
+				responseBody: "",
+			},
+		},
+	}
+
+	ts := httptest.NewServer(testRouter)
+	defer ts.Close()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resp, resultBody := testRequest(t, ts, http.MethodPost, "/api/shorten", bytes.NewBuffer([]byte(tt.body)))
+			defer resp.Body.Close()
+
+			assert.Equal(t, tt.want.statusCode, resp.StatusCode)
+			assert.Equal(t, tt.want.contentType, resp.Header.Get("Content-Type"))
+			assert.Equal(t, tt.want.responseBody, resultBody)
+		})
+	}
+}
