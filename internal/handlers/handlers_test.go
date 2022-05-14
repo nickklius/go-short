@@ -113,7 +113,7 @@ func TestShortenHandler(t *testing.T) {
 			path: "/",
 			want: want{
 				statusCode:    http.StatusCreated,
-				lenShortenURL: len(h.Config.BaseURL) + h.Config.KeyLength,
+				lenShortenURL: len(h.Config.BaseURL) + 1 + h.Config.KeyLength,
 			},
 		},
 	}
@@ -176,7 +176,7 @@ func TestShortenJsonHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			testRouter := chi.NewRouter()
-			testRouter.Post(tt.path, h.ShortenJsonHandler())
+			testRouter.Post(tt.path, h.ShortenJSONHandler())
 
 			ts := httptest.NewServer(testRouter)
 			defer ts.Close()

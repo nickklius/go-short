@@ -26,7 +26,37 @@ func New() *Handler {
 	}
 }
 
-func (h *Handler) ShortenJsonHandler() http.HandlerFunc {
+func (h *Handler) ShortenHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		b, err := io.ReadAll(r.Body)
+		defer r.Body.Close()
+
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if len(b) > 0 {
+			shortURL, err := storage.CreateShortURL(h.Storage, context.Background(), string(b))
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			w.WriteHeader(http.StatusCreated)
+
+			_, err = w.Write([]byte(h.Config.BaseURL + "/" + shortURL))
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+	}
+}
+
+func (h *Handler) ShortenJSONHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		b, err := io.ReadAll(r.Body)
 		defer r.Body.Close()
@@ -58,7 +88,7 @@ func (h *Handler) ShortenJsonHandler() http.HandlerFunc {
 		result := struct {
 			Result string `json:"result"`
 		}{
-			Result: h.Config.BaseURL + shortURL,
+			Result: h.Config.BaseURL + "/" + shortURL,
 		}
 
 		w.Header().Add("Content-Type", "application/json; charset=utf-8")
@@ -73,36 +103,6 @@ func (h *Handler) ShortenJsonHandler() http.HandlerFunc {
 		_, err = w.Write(b)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-	}
-}
-
-func (h *Handler) ShortenHandler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		b, err := io.ReadAll(r.Body)
-		defer r.Body.Close()
-
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		if len(b) > 0 {
-			shortURL, err := storage.CreateShortURL(h.Storage, context.Background(), string(b))
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			w.WriteHeader(http.StatusCreated)
-
-			_, err = w.Write([]byte(h.Config.BaseURL + shortURL))
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-		} else {
-			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 	}

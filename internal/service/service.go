@@ -26,7 +26,7 @@ func (s *service) Start() {
 	r.Route("/", func(r chi.Router) {
 		r.Get("/{id}", h.RetrieveHandler())
 		r.Post("/", h.ShortenHandler())
-		r.Post("/api/shorten", h.ShortenJsonHandler())
+		r.Post("/api/shorten", h.ShortenJSONHandler())
 	})
 
 	log.Fatal(http.ListenAndServe(h.Config.ServerAddress, r))
