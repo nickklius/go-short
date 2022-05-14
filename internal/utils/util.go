@@ -6,9 +6,11 @@ import (
 )
 
 func GenerateKey() string {
-	b := make([]byte, config.KeyLength)
+	c := config.New()
+
+	b := make([]byte, c.KeyLength)
 	for i := range b {
-		b[i] = config.Letters[rand.Intn(len(config.Letters))]
+		b[i] = c.Letters[rand.Intn(len(c.Letters))]
 	}
 	return string(b)
 }

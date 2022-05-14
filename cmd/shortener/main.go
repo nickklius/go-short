@@ -1,16 +1,9 @@
 package main
 
-import (
-	"github.com/nickklius/go-short/internal/config"
-	"github.com/nickklius/go-short/internal/handlers"
-	"github.com/nickklius/go-short/internal/storage"
-	"log"
-	"net/http"
-)
+import "github.com/nickklius/go-short/internal/service"
 
 func main() {
-	var URLStorage storage.Repository = &storage.MapURLStorage{Storage: map[string]string{}}
+	s := service.New()
 
-	r := handlers.ServiceRouter(URLStorage)
-	log.Fatal(http.ListenAndServe(":"+config.Port, r))
+	s.Start()
 }
