@@ -3,19 +3,42 @@ package service
 import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/nickklius/go-short/internal/config"
 	"github.com/nickklius/go-short/internal/handlers"
+	"github.com/nickklius/go-short/internal/storages"
 	"log"
 	"net/http"
 )
 
-type service struct{}
-
-func New() *service {
-	return &service{}
+type Service struct {
+	storage storages.Repository
+	conf    config.Config
 }
 
-func (s *service) Start() {
-	h := handlers.New()
+func New() *Service {
+	var s storages.Repository
+	var c config.Config
+
+	c = config.New()
+
+	if c.FileStoragePath != "" {
+		s, _ = storages.NewLocalStorage(c.FileStoragePath)
+	} else {
+		s = storages.NewMemoryStorage()
+	}
+	return &Service{
+		storage: s,
+		conf:    c,
+	}
+}
+
+func (s *Service) Start() {
+	h := handlers.NewHandler(s.storage)
+
+	log.Fatal(http.ListenAndServe(s.conf.ServerAddress, s.Router(h)))
+}
+
+func (s *Service) Router(h *handlers.Handler) chi.Router {
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
@@ -29,5 +52,5 @@ func (s *service) Start() {
 		r.Post("/api/shorten", h.ShortenJSONHandler())
 	})
 
-	log.Fatal(http.ListenAndServe(h.Config.ServerAddress, r))
+	return r
 }
