@@ -1,16 +1,13 @@
 package utils
 
 import (
-	"github.com/nickklius/go-short/internal/config"
 	"math/rand"
 )
 
-func GenerateKey() string {
-	c := config.New()
-
-	b := make([]byte, c.KeyLength)
+func GenerateKey(letters string, keyLength int) string {
+	b := make([]byte, keyLength)
 	for i := range b {
-		b[i] = c.Letters[rand.Intn(len(c.Letters))]
+		b[i] = letters[rand.Intn(len(letters))]
 	}
 	return string(b)
 }

@@ -18,10 +18,10 @@ type URL struct {
 	URL string `json:"url"`
 }
 
-func NewHandler(s storages.Repository) *Handler {
+func NewHandler(s storages.Repository, c config.Config) *Handler {
 	return &Handler{
 		storage: s,
-		config:  config.New(),
+		config:  c,
 	}
 }
 

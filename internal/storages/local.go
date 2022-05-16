@@ -2,6 +2,7 @@ package storages
 
 import (
 	"encoding/json"
+	"github.com/nickklius/go-short/internal/config"
 	"os"
 )
 
@@ -10,10 +11,16 @@ type LocalStorage struct {
 	data     Repository
 }
 
-func NewLocalStorage(fileName string) (Repository, error) {
-	s := NewMemoryStorage()
+type fileHandler struct {
+	file    *os.File
+	encoder *json.Encoder
+	decoder *json.Decoder
+}
 
-	f, err := NewFileHandler(fileName)
+func NewLocalStorage(c config.Config) (Repository, error) {
+	s := NewMemoryStorage(c)
+
+	f, err := NewFileHandler(c.FileStoragePath)
 	if err != nil {
 		return s, err
 	}
@@ -21,7 +28,7 @@ func NewLocalStorage(fileName string) (Repository, error) {
 	f.Read(s)
 
 	return &LocalStorage{
-		fileName: fileName,
+		fileName: c.FileStoragePath,
 		data:     s,
 	}, nil
 }
@@ -45,12 +52,6 @@ func (s *LocalStorage) Create(longURL string) (string, error) {
 
 func (s *LocalStorage) GetAll() *map[string]string {
 	return s.data.GetAll()
-}
-
-type fileHandler struct {
-	file    *os.File
-	encoder *json.Encoder
-	decoder *json.Decoder
 }
 
 func NewFileHandler(fileName string) (*fileHandler, error) {

@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"github.com/go-chi/chi/v5"
+	"github.com/nickklius/go-short/internal/config"
 	"github.com/nickklius/go-short/internal/storages"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -11,10 +12,16 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 )
 
-var testStorage = storages.NewMemoryStorage()
+var c = config.NewConfig()
+
+func TestMain(m *testing.M) {
+	c.ParseFlags()
+	os.Exit(m.Run())
+}
 
 func testRequest(t *testing.T, ts *httptest.Server, method, path string, body io.Reader) (*http.Response, string) {
 	req, err := http.NewRequest(method, ts.URL+path, body)
@@ -38,7 +45,8 @@ func testRequest(t *testing.T, ts *httptest.Server, method, path string, body io
 }
 
 func TestRetrieveHandler(t *testing.T) {
-	h := NewHandler(testStorage)
+	s := storages.NewMemoryStorage(c)
+	h := NewHandler(s, c)
 
 	if _, err := h.storage.Create("https://yandex.ru"); err != nil {
 		log.Fatal(err)
@@ -93,7 +101,8 @@ func TestRetrieveHandler(t *testing.T) {
 }
 
 func TestShortenHandler(t *testing.T) {
-	h := NewHandler(testStorage)
+	s := storages.NewMemoryStorage(c)
+	h := NewHandler(s, c)
 
 	type want struct {
 		statusCode    int
@@ -135,7 +144,8 @@ func TestShortenHandler(t *testing.T) {
 }
 
 func TestShortenJsonHandler(t *testing.T) {
-	h := NewHandler(testStorage)
+	s := storages.NewMemoryStorage(c)
+	h := NewHandler(s, c)
 
 	type want struct {
 		statusCode   int

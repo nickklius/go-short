@@ -11,31 +11,30 @@ import (
 )
 
 type Service struct {
-	storage storages.Repository
-	conf    config.Config
+	Storage storages.Repository
+	Conf    config.Config
 }
 
-func New() *Service {
+func NewService() *Service {
 	var s storages.Repository
-	var c config.Config
-
-	c = config.New()
+	c := config.NewConfig()
+	c.ParseFlags()
 
 	if c.FileStoragePath != "" {
-		s, _ = storages.NewLocalStorage(c.FileStoragePath)
+		s, _ = storages.NewLocalStorage(c)
 	} else {
-		s = storages.NewMemoryStorage()
+		s = storages.NewMemoryStorage(c)
 	}
 	return &Service{
-		storage: s,
-		conf:    c,
+		Storage: s,
+		Conf:    c,
 	}
 }
 
 func (s *Service) Start() {
-	h := handlers.NewHandler(s.storage)
+	h := handlers.NewHandler(s.Storage, s.Conf)
 
-	log.Fatal(http.ListenAndServe(s.conf.ServerAddress, s.Router(h)))
+	log.Fatal(http.ListenAndServe(s.Conf.ServerAddress, s.Router(h)))
 }
 
 func (s *Service) Router(h *handlers.Handler) chi.Router {

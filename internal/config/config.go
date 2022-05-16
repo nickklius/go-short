@@ -1,6 +1,7 @@
 package config
 
 import (
+	"flag"
 	"github.com/caarlos0/env/v6"
 	"log"
 )
@@ -13,11 +14,17 @@ type Config struct {
 	FileStoragePath string `env:"FILE_STORAGE_PATH" envDefault:"storage.json"`
 }
 
-func New() Config {
-	var cfg Config
-
-	if err := env.Parse(&cfg); err != nil {
+func NewConfig() Config {
+	var c Config
+	if err := env.Parse(&c); err != nil {
 		log.Fatal(err)
 	}
-	return cfg
+	return c
+}
+
+func (c *Config) ParseFlags() {
+	flag.StringVar(&c.ServerAddress, "a", c.ServerAddress, "Server address")
+	flag.StringVar(&c.BaseURL, "b", c.BaseURL, "Base URL")
+	flag.StringVar(&c.FileStoragePath, "f", c.FileStoragePath, "File storage path")
+	flag.Parse()
 }
