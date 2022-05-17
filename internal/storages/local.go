@@ -2,8 +2,9 @@ package storages
 
 import (
 	"encoding/json"
-	"github.com/nickklius/go-short/internal/config"
 	"os"
+
+	"github.com/nickklius/go-short/internal/config"
 )
 
 type LocalStorage struct {

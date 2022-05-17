@@ -1,13 +1,14 @@
 package service
 
 import (
+	"log"
+	"net/http"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/nickklius/go-short/internal/config"
 	"github.com/nickklius/go-short/internal/handlers"
 	"github.com/nickklius/go-short/internal/storages"
-	"log"
-	"net/http"
 )
 
 type Service struct {

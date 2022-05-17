@@ -2,11 +2,12 @@ package handlers
 
 import (
 	"encoding/json"
+	"io"
+	"net/http"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/nickklius/go-short/internal/config"
 	"github.com/nickklius/go-short/internal/storages"
-	"io"
-	"net/http"
 )
 
 type Handler struct {

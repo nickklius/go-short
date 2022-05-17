@@ -2,11 +2,6 @@ package handlers
 
 import (
 	"bytes"
-	"github.com/go-chi/chi/v5"
-	"github.com/nickklius/go-short/internal/config"
-	"github.com/nickklius/go-short/internal/storages"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"io"
 	"io/ioutil"
 	"log"
@@ -14,6 +9,12 @@ import (
 	"net/http/httptest"
 	"os"
 	"testing"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/nickklius/go-short/internal/config"
+	"github.com/nickklius/go-short/internal/storages"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var c = config.NewConfig()
