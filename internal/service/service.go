@@ -45,6 +45,9 @@ func (s *Service) Router(h *handlers.Handler) chi.Router {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
+	r.Use(handlers.GzipDecompressor)
+	r.Use(handlers.GzipCompressor)
+
 	r.Route("/", func(r chi.Router) {
 		r.Get("/{id}", h.RetrieveHandler())
 		r.Post("/", h.ShortenHandler())
