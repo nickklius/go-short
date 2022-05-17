@@ -1,7 +1,6 @@
 package service
 
 import (
-	"log"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -16,26 +15,36 @@ type Service struct {
 	Conf    config.Config
 }
 
-func NewService() *Service {
+func NewService() (*Service, error) {
 	var s storages.Repository
-	c := config.NewConfig()
+	c, err := config.NewConfig()
+	if err != nil {
+		return nil, err
+	}
 	c.ParseFlags()
 
 	if c.FileStoragePath != "" {
-		s, _ = storages.NewLocalStorage(c)
+		s, err = storages.NewLocalStorage(c)
+		if err != nil {
+			return nil, err
+		}
 	} else {
 		s = storages.NewMemoryStorage(c)
 	}
 	return &Service{
 		Storage: s,
 		Conf:    c,
-	}
+	}, nil
 }
 
-func (s *Service) Start() {
+func (s *Service) Start() error {
 	h := handlers.NewHandler(s.Storage, s.Conf)
 
-	log.Fatal(http.ListenAndServe(s.Conf.ServerAddress, s.Router(h)))
+	err := http.ListenAndServe(s.Conf.ServerAddress, s.Router(h))
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (s *Service) Router(h *handlers.Handler) chi.Router {
@@ -50,9 +59,9 @@ func (s *Service) Router(h *handlers.Handler) chi.Router {
 	r.Use(handlers.GzipCompressor)
 
 	r.Route("/", func(r chi.Router) {
-		r.Get("/{id}", h.RetrieveHandler())
-		r.Post("/", h.ShortenHandler())
-		r.Post("/api/shorten", h.ShortenJSONHandler())
+		r.Get("/{id}", h.RetrieveHandler)
+		r.Post("/", h.ShortenHandler)
+		r.Post("/api/shorten", h.ShortenJSONHandler)
 	})
 
 	return r

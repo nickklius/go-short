@@ -17,7 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var c = config.NewConfig()
+var c, _ = config.NewConfig()
 
 func TestMain(m *testing.M) {
 	c.ParseFlags()
@@ -88,7 +88,7 @@ func TestRetrieveHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			testRouter := chi.NewRouter()
-			testRouter.Get("/{id}", h.RetrieveHandler())
+			testRouter.Get("/{id}", h.RetrieveHandler)
 
 			ts := httptest.NewServer(testRouter)
 			defer ts.Close()
@@ -130,7 +130,7 @@ func TestShortenHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			testRouter := chi.NewRouter()
-			testRouter.Post(tt.path, h.ShortenHandler())
+			testRouter.Post(tt.path, h.ShortenHandler)
 
 			ts := httptest.NewServer(testRouter)
 			defer ts.Close()
@@ -185,7 +185,7 @@ func TestShortenJsonHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			testRouter := chi.NewRouter()
-			testRouter.Post(tt.path, h.ShortenJSONHandler())
+			testRouter.Post(tt.path, h.ShortenJSONHandler)
 
 			ts := httptest.NewServer(testRouter)
 			defer ts.Close()

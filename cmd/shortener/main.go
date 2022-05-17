@@ -1,9 +1,19 @@
 package main
 
-import "github.com/nickklius/go-short/internal/service"
+import (
+	"log"
+
+	"github.com/nickklius/go-short/internal/service"
+)
 
 func main() {
-	s := service.NewService()
+	s, err := service.NewService()
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	s.Start()
+	err = s.Start()
+	if err != nil {
+		log.Fatal(err)
+	}
 }
