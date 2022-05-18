@@ -17,10 +17,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var c, _ = config.NewConfig()
+var c config.Config
 
 func TestMain(m *testing.M) {
-	c.ParseFlags()
+	c, _ = config.NewConfig()
 	os.Exit(m.Run())
 }
 

@@ -21,7 +21,6 @@ func NewService() (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	c.ParseFlags()
 
 	if c.FileStoragePath != "" {
 		s, err = storages.NewLocalStorage(c)

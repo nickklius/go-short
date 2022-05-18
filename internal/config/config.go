@@ -19,14 +19,11 @@ func NewConfig() (Config, error) {
 	if err := env.Parse(&c); err != nil {
 		return c, err
 	}
-	return c, nil
-}
 
-// ParseFlags был в NewConfig(), вынес для того, чтобы можно было парсить флаги в
-// TestMain(m *testing.M) handlers_test.go, иначе валятся тесты
-func (c *Config) ParseFlags() {
 	flag.StringVar(&c.ServerAddress, "a", c.ServerAddress, "Server address")
 	flag.StringVar(&c.BaseURL, "b", c.BaseURL, "Base URL")
 	flag.StringVar(&c.FileStoragePath, "f", c.FileStoragePath, "File storage path")
 	flag.Parse()
+
+	return c, nil
 }
