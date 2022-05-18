@@ -3,12 +3,12 @@ package storages
 import "errors"
 
 var (
-	ErrNotFound = errors.New("not found")
+	ErrNotFound      = errors.New("not found")
+	ErrAlreadyExists = errors.New("key already exist")
 )
 
 type Repository interface {
-	Create(longURL string) (string, error)
+	Create(shortURL, longURL string) error
 	Read(shortURL string) (string, error)
-	GetAll() *map[string]string // без указателя разваливается реализация
-	Flush() error
+	GetAll() map[string]string
 }

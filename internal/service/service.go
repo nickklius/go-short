@@ -28,7 +28,7 @@ func NewService() (*Service, error) {
 			return nil, err
 		}
 	} else {
-		s = storages.NewMemoryStorage(c)
+		s = storages.NewMemoryStorage()
 	}
 	return &Service{
 		Storage: s,

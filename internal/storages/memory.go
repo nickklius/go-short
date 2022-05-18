@@ -4,7 +4,6 @@ import (
 	"sync"
 
 	"github.com/nickklius/go-short/internal/config"
-	"github.com/nickklius/go-short/internal/utils"
 )
 
 type MemoryStorage struct {
@@ -13,9 +12,8 @@ type MemoryStorage struct {
 	data map[string]string
 }
 
-func NewMemoryStorage(c config.Config) Repository {
+func NewMemoryStorage() Repository {
 	return &MemoryStorage{
-		conf: c,
 		data: make(map[string]string),
 	}
 }
@@ -31,25 +29,20 @@ func (s *MemoryStorage) Read(shortURL string) (string, error) {
 	return "", ErrNotFound
 }
 
-func (s *MemoryStorage) Create(longURL string) (string, error) {
+func (s *MemoryStorage) Create(shortURL, longURL string) error {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 
-	for {
-		short := utils.GenerateKey(s.conf.Letters, s.conf.KeyLength)
-		if _, ok := s.data[short]; !ok {
-			s.data[short] = longURL
-			return short, nil
-		}
+	if _, ok := s.data[shortURL]; ok {
+		return ErrAlreadyExists
 	}
+	s.data[shortURL] = longURL
+
+	return nil
 }
 
-func (s *MemoryStorage) GetAll() *map[string]string {
+func (s *MemoryStorage) GetAll() map[string]string {
 	s.mux.Lock()
 	defer s.mux.Unlock()
-	return &s.data
-}
-
-func (s *MemoryStorage) Flush() error {
-	return nil
+	return s.data
 }

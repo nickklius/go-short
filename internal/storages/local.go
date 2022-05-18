@@ -21,7 +21,7 @@ type fileHandler struct {
 }
 
 func NewLocalStorage(c config.Config) (Repository, error) {
-	s := NewMemoryStorage(c)
+	s := NewMemoryStorage()
 
 	f, err := NewFileHandler(c.FileStoragePath)
 	if err != nil {
@@ -41,16 +41,7 @@ func (s *LocalStorage) Read(shortURL string) (string, error) {
 	return s.data.Read(shortURL)
 }
 
-func (s *LocalStorage) Create(longURL string) (string, error) {
-	shortURL, err := s.data.Create(longURL)
-	return shortURL, err
-}
-
-func (s *LocalStorage) GetAll() *map[string]string {
-	return s.data.GetAll()
-}
-
-func (s *LocalStorage) Flush() error {
+func (s *LocalStorage) Create(shortURL, longURL string) error {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 
@@ -60,12 +51,20 @@ func (s *LocalStorage) Flush() error {
 	}
 	defer f.Close()
 
-	err = f.Save(s)
+	err = s.data.Create(shortURL, longURL)
 	if err != nil {
 		return err
 	}
 
+	err = f.Save(s)
+	if err != nil {
+		return err
+	}
 	return nil
+}
+
+func (s *LocalStorage) GetAll() map[string]string {
+	return s.data.GetAll()
 }
 
 func NewFileHandler(fileName string) (*fileHandler, error) {
@@ -90,13 +89,22 @@ func (f *fileHandler) Save(s Repository) error {
 	if err != nil {
 		return err
 	}
-	return nil
+	return f.file.Sync()
 }
 
 func (f *fileHandler) Read(s Repository) error {
-	err := f.decoder.Decode(s.GetAll())
+	m := make(map[string]string)
+	err := f.decoder.Decode(&m)
 	if err != nil {
 		return err
 	}
+
+	for k, v := range m {
+		err = s.Create(k, v)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }

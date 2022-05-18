@@ -46,10 +46,10 @@ func testRequest(t *testing.T, ts *httptest.Server, method, path string, body io
 }
 
 func TestRetrieveHandler(t *testing.T) {
-	s := storages.NewMemoryStorage(c)
+	s := storages.NewMemoryStorage()
 	h := NewHandler(s, c)
 
-	if _, err := h.storage.Create("https://yandex.ru"); err != nil {
+	if err := h.storage.Create("5fbbd", "https://yandex.ru"); err != nil {
 		log.Fatal(err)
 	}
 
@@ -102,7 +102,7 @@ func TestRetrieveHandler(t *testing.T) {
 }
 
 func TestShortenHandler(t *testing.T) {
-	s := storages.NewMemoryStorage(c)
+	s := storages.NewMemoryStorage()
 	h := NewHandler(s, c)
 
 	type want struct {
@@ -145,7 +145,7 @@ func TestShortenHandler(t *testing.T) {
 }
 
 func TestShortenJsonHandler(t *testing.T) {
-	s := storages.NewMemoryStorage(c)
+	s := storages.NewMemoryStorage()
 	h := NewHandler(s, c)
 
 	type want struct {
@@ -195,7 +195,7 @@ func TestShortenJsonHandler(t *testing.T) {
 
 			assert.Equal(t, tt.want.statusCode, resp.StatusCode)
 			assert.Equal(t, tt.want.contentType, resp.Header.Get("Content-Type"))
-			assert.Equal(t, tt.want.responseBody, resultBody)
+			assert.Equal(t, len(tt.want.responseBody), len(resultBody))
 		})
 	}
 }

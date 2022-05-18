@@ -8,6 +8,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/nickklius/go-short/internal/config"
 	"github.com/nickklius/go-short/internal/storages"
+	"github.com/nickklius/go-short/internal/utils"
 )
 
 type Handler struct {
@@ -29,7 +30,6 @@ func NewHandler(s storages.Repository, c config.Config) *Handler {
 func (h *Handler) ShortenHandler(w http.ResponseWriter, r *http.Request) {
 	b, err := io.ReadAll(r.Body)
 	defer r.Body.Close()
-	defer h.storage.Flush()
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -37,9 +37,10 @@ func (h *Handler) ShortenHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(b) > 0 {
-		shortURL, err := h.storage.Create(string(b))
+		shortURL := utils.GenerateKey(h.config.Letters, h.config.KeyLength)
+		err = h.storage.Create(shortURL, string(b))
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			http.Error(w, err.Error(), http.StatusConflict)
 			return
 		}
 		w.WriteHeader(http.StatusCreated)
@@ -58,7 +59,6 @@ func (h *Handler) ShortenHandler(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) ShortenJSONHandler(w http.ResponseWriter, r *http.Request) {
 	b, err := io.ReadAll(r.Body)
 	defer r.Body.Close()
-	defer h.storage.Flush()
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -78,9 +78,10 @@ func (h *Handler) ShortenJSONHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shortURL, err := h.storage.Create(url.URL)
+	shortURL := utils.GenerateKey(h.config.Letters, h.config.KeyLength)
+	err = h.storage.Create(shortURL, url.URL)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}
 
