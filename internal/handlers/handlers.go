@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/url"
@@ -11,6 +12,11 @@ import (
 	"github.com/nickklius/go-short/internal/config"
 	"github.com/nickklius/go-short/internal/storages"
 	"github.com/nickklius/go-short/internal/utils"
+)
+
+var (
+	ErrWrongURLFormat = errors.New("wrong format")
+	ErrOverCapacity   = errors.New("shortener capacity is over")
 )
 
 type Handler struct {
@@ -35,7 +41,7 @@ func (h *Handler) ShortenHandler(w http.ResponseWriter, r *http.Request) {
 
 	shortURL, err := h.prepareShortening(string(b))
 	if err != nil {
-		http.Error(w, err.Error(), storageErrToStatus(err))
+		http.Error(w, err.Error(), errToStatus(err))
 		return
 	}
 
@@ -62,7 +68,7 @@ func (h *Handler) ShortenJSONHandler(w http.ResponseWriter, r *http.Request) {
 
 	shortURL, err := h.prepareShortening(u.URL)
 	if err != nil {
-		http.Error(w, err.Error(), storageErrToStatus(err))
+		http.Error(w, err.Error(), errToStatus(err))
 		return
 	}
 
@@ -98,7 +104,7 @@ func (h *Handler) RetrieveHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	status := storageErrToStatus(err)
+	status := errToStatus(err)
 	http.Error(w, err.Error(), status)
 }
 
@@ -107,15 +113,19 @@ func (h *Handler) prepareShortening(u string) (string, error) {
 
 	_, err := url.ParseRequestURI(u)
 	if err != nil {
-		return shortURL, err
+		return shortURL, ErrWrongURLFormat
 	}
 
 	for i := 0; i < h.config.ShortenerCapacity; i++ {
 		shortURL = utils.GenerateKey(h.config.Letters, h.config.KeyLength)
 		err = h.storage.Create(shortURL, u)
-		if err != storages.ErrNotFound {
+		if err != storages.ErrAlreadyExists {
 			break
 		}
+	}
+
+	if err == storages.ErrAlreadyExists {
+		return shortURL, ErrOverCapacity
 	}
 
 	if err != nil {
@@ -125,12 +135,16 @@ func (h *Handler) prepareShortening(u string) (string, error) {
 	return shortURL, nil
 }
 
-func storageErrToStatus(err error) int {
+func errToStatus(err error) int {
 	switch err {
-	case storages.ErrAlreadyExists:
-		return http.StatusConflict
+	case ErrWrongURLFormat:
+		return http.StatusBadRequest
+	case ErrOverCapacity:
+		return http.StatusInternalServerError
 	case storages.ErrNotFound:
 		return http.StatusNotFound
+	case storages.ErrAlreadyExists:
+		return http.StatusConflict
 	default:
 		return http.StatusInternalServerError
 	}

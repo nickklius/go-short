@@ -40,8 +40,6 @@ func testRequest(t *testing.T, ts *httptest.Server, method, path string, body io
 	respBody, err := ioutil.ReadAll(resp.Body)
 	require.NoError(t, err)
 
-	defer resp.Body.Close()
-
 	return resp, string(respBody)
 }
 
@@ -94,7 +92,6 @@ func TestRetrieveHandler(t *testing.T) {
 			defer ts.Close()
 
 			resp, _ := testRequest(t, ts, http.MethodGet, tt.path, nil)
-			defer resp.Body.Close()
 
 			assert.Equal(t, tt.want.statusCode, resp.StatusCode)
 		})
@@ -136,7 +133,6 @@ func TestShortenHandler(t *testing.T) {
 			defer ts.Close()
 
 			resp, resultBody := testRequest(t, ts, http.MethodPost, "/", bytes.NewBuffer([]byte(tt.body)))
-			defer resp.Body.Close()
 
 			assert.Equal(t, tt.want.statusCode, resp.StatusCode)
 			assert.Equal(t, tt.want.lenShortenURL, len(resultBody))
@@ -175,9 +171,9 @@ func TestShortenJsonHandler(t *testing.T) {
 			body: "{\"_\":\"https://ya.ru/\"}",
 			path: "/api/shorten",
 			want: want{
-				statusCode:   http.StatusInternalServerError,
+				statusCode:   http.StatusBadRequest,
 				contentType:  "text/plain; charset=utf-8",
-				responseBody: "parse \"\": empty url\n",
+				responseBody: "wrong format\n",
 			},
 		},
 	}
