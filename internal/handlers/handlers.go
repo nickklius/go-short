@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/url"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/nickklius/go-short/internal/config"
@@ -16,10 +18,6 @@ type Handler struct {
 	config  config.Config
 }
 
-type URL struct {
-	URL string `json:"url"`
-}
-
 func NewHandler(s storages.Repository, c config.Config) *Handler {
 	return &Handler{
 		storage: s,
@@ -29,59 +27,42 @@ func NewHandler(s storages.Repository, c config.Config) *Handler {
 
 func (h *Handler) ShortenHandler(w http.ResponseWriter, r *http.Request) {
 	b, err := io.ReadAll(r.Body)
-	defer r.Body.Close()
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if len(b) > 0 {
-		shortURL := utils.GenerateKey(h.config.Letters, h.config.KeyLength)
-		err = h.storage.Create(shortURL, string(b))
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusConflict)
-			return
-		}
-		w.WriteHeader(http.StatusCreated)
+	shortURL, err := h.prepareShortening(string(b))
+	if err != nil {
+		http.Error(w, err.Error(), storageErrToStatus(err))
+		return
+	}
 
-		_, err = w.Write([]byte(h.config.BaseURL + "/" + shortURL))
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-	} else {
-		w.WriteHeader(http.StatusBadRequest)
+	w.WriteHeader(http.StatusCreated)
+
+	_, err = w.Write([]byte(h.config.BaseURL + "/" + shortURL))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 }
 
 func (h *Handler) ShortenJSONHandler(w http.ResponseWriter, r *http.Request) {
-	b, err := io.ReadAll(r.Body)
-	defer r.Body.Close()
+	u := struct {
+		URL string `json:"url"`
+	}{}
 
+	dec := json.NewDecoder(r.Body)
+	err := dec.Decode(&u)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	url := URL{}
-
-	err = json.Unmarshal(b, &url)
+	shortURL, err := h.prepareShortening(u.URL)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	if url.URL == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	shortURL := utils.GenerateKey(h.config.Letters, h.config.KeyLength)
-	err = h.storage.Create(shortURL, url.URL)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusConflict)
+		http.Error(w, err.Error(), storageErrToStatus(err))
 		return
 	}
 
@@ -91,16 +72,17 @@ func (h *Handler) ShortenJSONHandler(w http.ResponseWriter, r *http.Request) {
 		Result: h.config.BaseURL + "/" + shortURL,
 	}
 
-	w.Header().Add("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(http.StatusCreated)
-
-	b, err = json.Marshal(result)
+	buf := new(bytes.Buffer)
+	enc := json.NewEncoder(buf)
+	err = enc.Encode(result)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	_, err = w.Write(b)
+	w.Header().Add("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(http.StatusCreated)
+	_, err = w.Write(buf.Bytes())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -111,9 +93,45 @@ func (h *Handler) RetrieveHandler(w http.ResponseWriter, r *http.Request) {
 	shortURL := chi.URLParam(r, "id")
 	longURL, err := h.storage.Read(shortURL)
 
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	if err == nil {
+		http.Redirect(w, r, longURL, http.StatusTemporaryRedirect)
+		return
 	}
 
-	http.Redirect(w, r, longURL, http.StatusTemporaryRedirect)
+	status := storageErrToStatus(err)
+	http.Error(w, err.Error(), status)
+}
+
+func (h *Handler) prepareShortening(u string) (string, error) {
+	var shortURL string
+
+	_, err := url.ParseRequestURI(u)
+	if err != nil {
+		return shortURL, err
+	}
+
+	for i := 0; i < h.config.ShortenerCapacity; i++ {
+		shortURL = utils.GenerateKey(h.config.Letters, h.config.KeyLength)
+		err = h.storage.Create(shortURL, u)
+		if err != storages.ErrNotFound {
+			break
+		}
+	}
+
+	if err != nil {
+		return shortURL, err
+	}
+
+	return shortURL, nil
+}
+
+func storageErrToStatus(err error) int {
+	switch err {
+	case storages.ErrAlreadyExists:
+		return http.StatusConflict
+	case storages.ErrNotFound:
+		return http.StatusNotFound
+	default:
+		return http.StatusInternalServerError
+	}
 }

@@ -23,7 +23,7 @@ func NewService() (*Service, error) {
 	}
 
 	if c.FileStoragePath != "" {
-		s, err = storages.NewLocalStorage(c)
+		s, err = storages.NewLocalStorage(c.FileStoragePath)
 		if err != nil {
 			return nil, err
 		}

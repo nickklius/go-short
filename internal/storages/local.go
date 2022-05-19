@@ -2,10 +2,9 @@ package storages
 
 import (
 	"encoding/json"
+	"io"
 	"os"
 	"sync"
-
-	"github.com/nickklius/go-short/internal/config"
 )
 
 type LocalStorage struct {
@@ -20,19 +19,22 @@ type fileHandler struct {
 	decoder *json.Decoder
 }
 
-func NewLocalStorage(c config.Config) (Repository, error) {
+func NewLocalStorage(p string) (Repository, error) {
 	s := NewMemoryStorage()
 
-	f, err := NewFileHandler(c.FileStoragePath)
+	f, err := NewFileHandler(p)
 	if err != nil {
 		return s, err
 	}
 	defer f.Close()
 
-	f.Read(s)
+	err = f.Read(s)
+	if (err != io.EOF) && (err != nil) {
+		return nil, err
+	}
 
 	return &LocalStorage{
-		fileName: c.FileStoragePath,
+		fileName: p,
 		data:     s,
 	}, nil
 }

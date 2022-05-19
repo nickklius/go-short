@@ -73,7 +73,7 @@ func TestRetrieveHandler(t *testing.T) {
 			name: "fail: wrong short url 400",
 			path: "/abcde",
 			want: want{
-				statusCode: http.StatusBadRequest,
+				statusCode: http.StatusNotFound,
 			},
 		},
 		{
@@ -167,7 +167,7 @@ func TestShortenJsonHandler(t *testing.T) {
 			want: want{
 				statusCode:   http.StatusCreated,
 				contentType:  "application/json; charset=utf-8",
-				responseBody: "{\"result\":\"http://localhost:8080/e7ut4\"}",
+				responseBody: "{\"result\":\"http://localhost:8080/e7ut4\"}\n",
 			},
 		},
 		{
@@ -175,9 +175,9 @@ func TestShortenJsonHandler(t *testing.T) {
 			body: "{\"_\":\"https://ya.ru/\"}",
 			path: "/api/shorten",
 			want: want{
-				statusCode:   http.StatusBadRequest,
-				contentType:  "",
-				responseBody: "",
+				statusCode:   http.StatusInternalServerError,
+				contentType:  "text/plain; charset=utf-8",
+				responseBody: "parse \"\": empty url\n",
 			},
 		},
 	}

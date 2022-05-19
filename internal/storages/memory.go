@@ -2,13 +2,10 @@ package storages
 
 import (
 	"sync"
-
-	"github.com/nickklius/go-short/internal/config"
 )
 
 type MemoryStorage struct {
 	mux  sync.Mutex
-	conf config.Config
 	data map[string]string
 }
 
