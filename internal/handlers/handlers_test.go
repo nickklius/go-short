@@ -2,23 +2,27 @@ package handlers
 
 import (
 	"bytes"
-	"github.com/nickklius/go-short/internal/config"
-	"github.com/nickklius/go-short/internal/storage"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/nickklius/go-short/internal/config"
+	"github.com/nickklius/go-short/internal/storages"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-var (
-	testStorage storage.Repository = &storage.MapURLStorage{Storage: map[string]string{
-		"5fbbd": "https://yandex.ru",
-	}}
-	testRouter = ServiceRouter(testStorage)
-)
+var c config.Config
+
+func TestMain(m *testing.M) {
+	c, _ = config.NewConfig()
+	os.Exit(m.Run())
+}
 
 func testRequest(t *testing.T, ts *httptest.Server, method, path string, body io.Reader) (*http.Response, string) {
 	req, err := http.NewRequest(method, ts.URL+path, body)
@@ -42,6 +46,13 @@ func testRequest(t *testing.T, ts *httptest.Server, method, path string, body io
 }
 
 func TestRetrieveHandler(t *testing.T) {
+	s := storages.NewMemoryStorage()
+	h := NewHandler(s, c)
+
+	if err := h.storage.Create("5fbbd", "https://yandex.ru"); err != nil {
+		log.Fatal(err)
+	}
+
 	type want struct {
 		statusCode int
 	}
@@ -55,30 +66,33 @@ func TestRetrieveHandler(t *testing.T) {
 			name: "success: correct redirect 307",
 			path: "/5fbbd",
 			want: want{
-				statusCode: 307,
+				statusCode: http.StatusTemporaryRedirect,
 			},
 		},
 		{
 			name: "fail: wrong short url 400",
 			path: "/abcde",
 			want: want{
-				statusCode: 400,
+				statusCode: http.StatusNotFound,
 			},
 		},
 		{
 			name: "fail: empty short url",
 			path: "/",
 			want: want{
-				statusCode: 405,
+				statusCode: http.StatusNotFound,
 			},
 		},
 	}
 
-	ts := httptest.NewServer(testRouter)
-	defer ts.Close()
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			testRouter := chi.NewRouter()
+			testRouter.Get("/{id}", h.RetrieveHandler)
+
+			ts := httptest.NewServer(testRouter)
+			defer ts.Close()
+
 			resp, _ := testRequest(t, ts, http.MethodGet, tt.path, nil)
 			defer resp.Body.Close()
 
@@ -88,6 +102,9 @@ func TestRetrieveHandler(t *testing.T) {
 }
 
 func TestShortenHandler(t *testing.T) {
+	s := storages.NewMemoryStorage()
+	h := NewHandler(s, c)
+
 	type want struct {
 		statusCode    int
 		lenShortenURL int
@@ -96,23 +113,28 @@ func TestShortenHandler(t *testing.T) {
 	tests := []struct {
 		name string
 		body string
+		path string
 		want want
 	}{
 		{
 			name: "success: URL shorten, response status code 201",
 			body: "https://ya.ru",
+			path: "/",
 			want: want{
-				statusCode:    201,
-				lenShortenURL: len(config.ServiceURL+"/") + config.KeyLength,
+				statusCode:    http.StatusCreated,
+				lenShortenURL: len(h.config.BaseURL) + 1 + h.config.KeyLength,
 			},
 		},
 	}
 
-	ts := httptest.NewServer(testRouter)
-	defer ts.Close()
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			testRouter := chi.NewRouter()
+			testRouter.Post(tt.path, h.ShortenHandler)
+
+			ts := httptest.NewServer(testRouter)
+			defer ts.Close()
+
 			resp, resultBody := testRequest(t, ts, http.MethodPost, "/", bytes.NewBuffer([]byte(tt.body)))
 			defer resp.Body.Close()
 
@@ -123,6 +145,9 @@ func TestShortenHandler(t *testing.T) {
 }
 
 func TestShortenJsonHandler(t *testing.T) {
+	s := storages.NewMemoryStorage()
+	h := NewHandler(s, c)
+
 	type want struct {
 		statusCode   int
 		contentType  string
@@ -132,39 +157,45 @@ func TestShortenJsonHandler(t *testing.T) {
 	tests := []struct {
 		name string
 		body string
+		path string
 		want want
 	}{
 		{
 			name: "success: URL shorten json, response status code 201",
 			body: "{\"url\":\"https://ya.ru/\"}",
+			path: "/api/shorten",
 			want: want{
-				statusCode:   201,
+				statusCode:   http.StatusCreated,
 				contentType:  "application/json; charset=utf-8",
-				responseBody: "{\"result\":\"http://localhost:8080/e7ut4\"}",
+				responseBody: "{\"result\":\"http://localhost:8080/e7ut4\"}\n",
 			},
 		},
 		{
 			name: "fail: wrong request body for shorten json handler",
 			body: "{\"_\":\"https://ya.ru/\"}",
+			path: "/api/shorten",
 			want: want{
-				statusCode:   400,
-				contentType:  "",
-				responseBody: "",
+				statusCode:   http.StatusBadRequest,
+				contentType:  "text/plain; charset=utf-8",
+				responseBody: "wrong format\n",
 			},
 		},
 	}
 
-	ts := httptest.NewServer(testRouter)
-	defer ts.Close()
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			resp, resultBody := testRequest(t, ts, http.MethodPost, "/api/shorten", bytes.NewBuffer([]byte(tt.body)))
+			testRouter := chi.NewRouter()
+			testRouter.Post(tt.path, h.ShortenJSONHandler)
+
+			ts := httptest.NewServer(testRouter)
+			defer ts.Close()
+
+			resp, resultBody := testRequest(t, ts, http.MethodPost, tt.path, bytes.NewBuffer([]byte(tt.body)))
 			defer resp.Body.Close()
 
 			assert.Equal(t, tt.want.statusCode, resp.StatusCode)
 			assert.Equal(t, tt.want.contentType, resp.Header.Get("Content-Type"))
-			assert.Equal(t, tt.want.responseBody, resultBody)
+			assert.Equal(t, len(tt.want.responseBody), len(resultBody))
 		})
 	}
 }

@@ -1,132 +1,151 @@
 package handlers
 
 import (
-	"context"
+	"bytes"
 	"encoding/json"
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
-	"github.com/nickklius/go-short/internal/config"
-	"github.com/nickklius/go-short/internal/storage"
+	"errors"
 	"io"
 	"net/http"
+	"net/url"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/nickklius/go-short/internal/config"
+	"github.com/nickklius/go-short/internal/storages"
+	"github.com/nickklius/go-short/internal/utils"
 )
 
-type URL struct {
-	URL string `json:"url"`
+var (
+	ErrWrongURLFormat = errors.New("wrong format")
+	ErrOverCapacity   = errors.New("shortener capacity is over")
+)
+
+type Handler struct {
+	storage storages.Repository
+	config  config.Config
 }
 
-func ServiceRouter(repo storage.Repository) chi.Router {
-	r := chi.NewRouter()
-
-	r.Use(middleware.RequestID)
-	r.Use(middleware.RealIP)
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
-
-	r.Route("/", func(r chi.Router) {
-		r.Get("/{id}", RetrieveHandler(repo))
-		r.Post("/", ShortenHandler(repo))
-		r.Post("/api/shorten", ShortenJsonHandler(repo))
-	})
-
-	return r
-}
-
-func ShortenJsonHandler(URLStorage storage.Repository) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		b, err := io.ReadAll(r.Body)
-		defer r.Body.Close()
-
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		url := URL{}
-
-		err = json.Unmarshal(b, &url)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		if url.URL == "" {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-
-		shortURL, err := storage.CreateShortURL(URLStorage, context.Background(), url.URL)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		result := struct {
-			Result string `json:"result"`
-		}{
-			Result: config.ServiceURL + "/" + shortURL,
-		}
-
-		w.Header().Add("Content-Type", "application/json; charset=utf-8")
-		w.WriteHeader(http.StatusCreated)
-
-		b, err = json.Marshal(result)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		_, err = w.Write(b)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
+func NewHandler(s storages.Repository, c config.Config) *Handler {
+	return &Handler{
+		storage: s,
+		config:  c,
 	}
 }
 
-func ShortenHandler(URLStorage storage.Repository) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		b, err := io.ReadAll(r.Body)
-		defer r.Body.Close()
+func (h *Handler) ShortenHandler(w http.ResponseWriter, r *http.Request) {
+	b, err := io.ReadAll(r.Body)
 
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
-		if len(b) > 0 {
-			shortURL, err := storage.CreateShortURL(URLStorage, context.Background(), string(b))
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			w.WriteHeader(http.StatusCreated)
+	shortURL, err := h.prepareShortening(string(b))
+	if err != nil {
+		http.Error(w, err.Error(), errToStatus(err))
+		return
+	}
 
-			_, err = w.Write([]byte(config.ServiceURL + "/" + shortURL))
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-		} else {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
+	w.WriteHeader(http.StatusCreated)
+
+	_, err = w.Write([]byte(h.config.BaseURL + "/" + shortURL))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 }
 
-func RetrieveHandler(URLStorage storage.Repository) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		shortURL := chi.URLParam(r, "id")
-		longURL, err := storage.RetrieveURL(URLStorage, context.Background(), shortURL)
+func (h *Handler) ShortenJSONHandler(w http.ResponseWriter, r *http.Request) {
+	u := struct {
+		URL string `json:"url"`
+	}{}
 
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
+	dec := json.NewDecoder(r.Body)
+	err := dec.Decode(&u)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
-		if longURL != "" {
-			http.Redirect(w, r, longURL, http.StatusTemporaryRedirect)
-		} else {
-			http.Error(w, "URL not found", http.StatusBadRequest)
+	shortURL, err := h.prepareShortening(u.URL)
+	if err != nil {
+		http.Error(w, err.Error(), errToStatus(err))
+		return
+	}
+
+	result := struct {
+		Result string `json:"result"`
+	}{
+		Result: h.config.BaseURL + "/" + shortURL,
+	}
+
+	buf := new(bytes.Buffer)
+	enc := json.NewEncoder(buf)
+	err = enc.Encode(result)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Add("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(http.StatusCreated)
+	_, err = w.Write(buf.Bytes())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+func (h *Handler) RetrieveHandler(w http.ResponseWriter, r *http.Request) {
+	shortURL := chi.URLParam(r, "id")
+	longURL, err := h.storage.Read(shortURL)
+
+	if err == nil {
+		http.Redirect(w, r, longURL, http.StatusTemporaryRedirect)
+		return
+	}
+
+	status := errToStatus(err)
+	http.Error(w, err.Error(), status)
+}
+
+func (h *Handler) prepareShortening(u string) (string, error) {
+	var shortURL string
+
+	_, err := url.ParseRequestURI(u)
+	if err != nil {
+		return shortURL, ErrWrongURLFormat
+	}
+
+	for i := 0; i < h.config.ShortenerCapacity; i++ {
+		shortURL = utils.GenerateKey(h.config.Letters, h.config.KeyLength)
+		err = h.storage.Create(shortURL, u)
+		if err != storages.ErrAlreadyExists {
+			break
 		}
+	}
+
+	if err == storages.ErrAlreadyExists {
+		return shortURL, ErrOverCapacity
+	}
+
+	if err != nil {
+		return shortURL, err
+	}
+
+	return shortURL, nil
+}
+
+func errToStatus(err error) int {
+	switch err {
+	case ErrWrongURLFormat:
+		return http.StatusBadRequest
+	case ErrOverCapacity:
+		return http.StatusInternalServerError
+	case storages.ErrNotFound:
+		return http.StatusNotFound
+	case storages.ErrAlreadyExists:
+		return http.StatusConflict
+	default:
+		return http.StatusInternalServerError
 	}
 }

@@ -1,14 +1,15 @@
 package utils
 
 import (
-	"github.com/nickklius/go-short/internal/config"
 	"math/rand"
+	"time"
 )
 
-func GenerateKey() string {
-	b := make([]byte, config.KeyLength)
+func GenerateKey(letters string, keyLength int) string {
+	rand.Seed(time.Now().UnixNano())
+	b := make([]byte, keyLength)
 	for i := range b {
-		b[i] = config.Letters[rand.Intn(len(config.Letters))]
+		b[i] = letters[rand.Intn(len(letters))]
 	}
 	return string(b)
 }
