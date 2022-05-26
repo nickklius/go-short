@@ -28,6 +28,5 @@ func NewConfig() (Config, error) {
 	flag.Parse()
 
 	c.ShortenerCapacity = int(math.Pow(float64(len(c.Letters)), float64(c.KeyLength)))
-
 	return c, nil
 }

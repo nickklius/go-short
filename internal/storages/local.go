@@ -43,7 +43,7 @@ func (s *LocalStorage) Read(shortURL string) (string, error) {
 	return s.data.Read(shortURL)
 }
 
-func (s *LocalStorage) Create(shortURL, longURL string) error {
+func (s *LocalStorage) Create(shortURL, longURL, userID string) error {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 
@@ -53,7 +53,7 @@ func (s *LocalStorage) Create(shortURL, longURL string) error {
 	}
 	defer f.Close()
 
-	err = s.data.Create(shortURL, longURL)
+	err = s.data.Create(shortURL, longURL, userID)
 	if err != nil {
 		return err
 	}
@@ -65,8 +65,12 @@ func (s *LocalStorage) Create(shortURL, longURL string) error {
 	return nil
 }
 
-func (s *LocalStorage) GetAll() map[string]string {
+func (s *LocalStorage) GetAll() map[string]URLEntry {
 	return s.data.GetAll()
+}
+
+func (s *LocalStorage) GetAllByUserID(userID string) map[string]URLEntry {
+	return s.data.GetAllByUserID(userID)
 }
 
 func NewFileHandler(fileName string) (*fileHandler, error) {
@@ -95,14 +99,14 @@ func (f *fileHandler) Save(s Repository) error {
 }
 
 func (f *fileHandler) Read(s Repository) error {
-	m := make(map[string]string)
+	m := make(map[string]URLEntry)
 	err := f.decoder.Decode(&m)
 	if err != nil {
 		return err
 	}
 
 	for k, v := range m {
-		err = s.Create(k, v)
+		err = s.Create(k, v.URL, v.UserID)
 		if err != nil {
 			return err
 		}

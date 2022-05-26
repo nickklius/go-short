@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/nickklius/go-short/internal/config"
 	"github.com/nickklius/go-short/internal/handlers"
+	mw "github.com/nickklius/go-short/internal/middleware"
 	"github.com/nickklius/go-short/internal/storages"
 )
 
@@ -54,11 +55,13 @@ func (s *Service) Router(h *handlers.Handler) chi.Router {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
-	r.Use(handlers.GzipDecompressor)
-	r.Use(handlers.GzipCompressor)
+	r.Use(mw.GzipDecompressor)
+	r.Use(mw.GzipCompressor)
+	r.Use(mw.UserID)
 
 	r.Route("/", func(r chi.Router) {
 		r.Get("/{id}", h.RetrieveHandler)
+		r.Get("/api/user/urls", h.GetUserURLs)
 		r.Post("/", h.ShortenHandler)
 		r.Post("/api/shorten", h.ShortenJSONHandler)
 	})

@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/nickklius/go-short/internal/config"
+	"github.com/nickklius/go-short/internal/middleware"
 	"github.com/nickklius/go-short/internal/storages"
 	"github.com/nickklius/go-short/internal/utils"
 )
@@ -17,6 +18,7 @@ import (
 var (
 	ErrWrongURLFormat = errors.New("wrong format")
 	ErrOverCapacity   = errors.New("shortener capacity is over")
+	userID            string
 )
 
 type Handler struct {
@@ -39,7 +41,13 @@ func (h *Handler) ShortenHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shortURL, err := h.prepareShortening(string(b))
+	err = middleware.GetCurrentUserID(r, &userID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	shortURL, err := h.prepareShortening(string(b), userID)
 	if err != nil {
 		http.Error(w, err.Error(), errToStatus(err))
 		return
@@ -66,7 +74,13 @@ func (h *Handler) ShortenJSONHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shortURL, err := h.prepareShortening(u.URL)
+	err = middleware.GetCurrentUserID(r, &userID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	shortURL, err := h.prepareShortening(u.URL, userID)
 	if err != nil {
 		http.Error(w, err.Error(), errToStatus(err))
 		return
@@ -108,17 +122,62 @@ func (h *Handler) RetrieveHandler(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, err.Error(), status)
 }
 
-func (h *Handler) prepareShortening(u string) (string, error) {
+func (h *Handler) GetUserURLs(w http.ResponseWriter, r *http.Request) {
+	type result struct {
+		ShortURL    string `json:"short_url"`
+		OriginalURL string `json:"original_url"`
+	}
+
+	var response []result
+
+	err := middleware.GetCurrentUserID(r, &userID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	urls := h.storage.GetAllByUserID(userID)
+
+	if len(urls) == 0 {
+		http.Error(w, "", http.StatusNoContent)
+		return
+	}
+
+	for short, urlEntry := range urls {
+		response = append(response, result{
+			ShortURL:    h.config.BaseURL + "/" + short,
+			OriginalURL: urlEntry.URL})
+	}
+
+	buf := new(bytes.Buffer)
+	enc := json.NewEncoder(buf)
+	err = enc.Encode(response)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Add("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	_, err = w.Write(buf.Bytes())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+}
+
+func (h *Handler) prepareShortening(longURL, userID string) (string, error) {
 	var shortURL string
 
-	_, err := url.ParseRequestURI(u)
+	_, err := url.ParseRequestURI(longURL)
 	if err != nil {
 		return shortURL, ErrWrongURLFormat
 	}
 
 	for i := 0; i < h.config.ShortenerCapacity; i++ {
 		shortURL = utils.GenerateKey(h.config.Letters, h.config.KeyLength)
-		err = h.storage.Create(shortURL, u)
+		err = h.storage.Create(shortURL, longURL, userID)
 		if err != storages.ErrAlreadyExists {
 			break
 		}
