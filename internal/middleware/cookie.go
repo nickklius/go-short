@@ -90,6 +90,10 @@ func GetCurrentUserID(r *http.Request, userID *string) error {
 
 func Decode(encUserID string, userID *string) error {
 	err := NewCookieHandler()
+	if err != nil {
+		return err
+	}
+
 	dst, err := hex.DecodeString(encUserID)
 	if err != nil {
 		return err
