@@ -122,7 +122,7 @@ func (h *Handler) RetrieveHandler(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, err.Error(), status)
 }
 
-func (h *Handler) GetUserURLs(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) RetrieveUserURLs(w http.ResponseWriter, r *http.Request) {
 	type result struct {
 		ShortURL    string `json:"short_url"`
 		OriginalURL string `json:"original_url"`

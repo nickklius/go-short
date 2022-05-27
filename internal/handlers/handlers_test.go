@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -200,9 +199,6 @@ func TestShortenJsonHandler(t *testing.T) {
 
 			resp, resultBody := testRequest(t, ts, http.MethodPost, tt.path, bytes.NewBuffer([]byte(tt.body)))
 			defer resp.Body.Close()
-
-			fmt.Println(tt.want.responseBody)
-			fmt.Println(resultBody)
 
 			assert.Equal(t, tt.want.statusCode, resp.StatusCode)
 			assert.Equal(t, tt.want.contentType, resp.Header.Get("Content-Type"))

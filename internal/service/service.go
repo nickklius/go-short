@@ -61,7 +61,7 @@ func (s *Service) Router(h *handlers.Handler) chi.Router {
 
 	r.Route("/", func(r chi.Router) {
 		r.Get("/{id}", h.RetrieveHandler)
-		r.Get("/api/user/urls", h.GetUserURLs)
+		r.Get("/api/user/urls", h.RetrieveUserURLs)
 		r.Post("/", h.ShortenHandler)
 		r.Post("/api/shorten", h.ShortenJSONHandler)
 	})
