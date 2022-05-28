@@ -8,7 +8,8 @@ var (
 )
 
 type Repository interface {
-	Create(shortURL, longURL string) error
+	Create(shortURL, longURL, userID string) error
 	Read(shortURL string) (string, error)
-	GetAll() map[string]string
+	GetAll() map[string]URLEntry
+	GetAllByUserID(userID string) map[string]URLEntry
 }

@@ -12,12 +12,15 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/nickklius/go-short/internal/config"
+	mw "github.com/nickklius/go-short/internal/middleware"
 	"github.com/nickklius/go-short/internal/storages"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-var c config.Config
+var (
+	c config.Config
+)
 
 func TestMain(m *testing.M) {
 	c, _ = config.NewConfig()
@@ -49,7 +52,7 @@ func TestRetrieveHandler(t *testing.T) {
 	s := storages.NewMemoryStorage()
 	h := NewHandler(s, c)
 
-	if err := h.storage.Create("5fbbd", "https://yandex.ru"); err != nil {
+	if err := h.storage.Create("5fbbd", "https://yandex.ru", ""); err != nil {
 		log.Fatal(err)
 	}
 
@@ -130,6 +133,8 @@ func TestShortenHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			testRouter := chi.NewRouter()
+			testRouter.Use(mw.UserID)
+
 			testRouter.Post(tt.path, h.ShortenHandler)
 
 			ts := httptest.NewServer(testRouter)
@@ -185,6 +190,8 @@ func TestShortenJsonHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			testRouter := chi.NewRouter()
+			testRouter.Use(mw.UserID)
+
 			testRouter.Post(tt.path, h.ShortenJSONHandler)
 
 			ts := httptest.NewServer(testRouter)
