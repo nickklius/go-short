@@ -18,19 +18,29 @@ type Service struct {
 
 func NewService() (*Service, error) {
 	var s storages.Repository
+
 	c, err := config.NewConfig()
 	if err != nil {
 		return nil, err
 	}
 
-	if c.FileStoragePath != "" {
+	switch {
+	case c.DatabaseDSN != "":
+		s, err = storages.NewDatabaseStorage(c.DatabaseDSN)
+		if err != nil {
+			return nil, storages.ErrDBConnNotEstablished
+		}
+		break
+	case c.FileStoragePath != "":
 		s, err = storages.NewLocalStorage(c.FileStoragePath)
 		if err != nil {
-			return nil, err
+			return nil, storages.ErrLocalStorageNotCreated
 		}
-	} else {
+		break
+	default:
 		s = storages.NewMemoryStorage()
 	}
+
 	return &Service{
 		Storage: s,
 		Conf:    c,
@@ -62,6 +72,7 @@ func (s *Service) Router(h *handlers.Handler) chi.Router {
 	r.Route("/", func(r chi.Router) {
 		r.Get("/{id}", h.RetrieveHandler)
 		r.Get("/api/user/urls", h.RetrieveUserURLs)
+		r.Get("/ping", h.PingDB)
 		r.Post("/", h.ShortenHandler)
 		r.Post("/api/shorten", h.ShortenJSONHandler)
 	})
