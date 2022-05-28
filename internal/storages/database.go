@@ -41,9 +41,5 @@ func (s *DatabaseStorage) GetAllByUserID(userID string) map[string]URLEntry {
 }
 
 func (s *DatabaseStorage) Ping() error {
-	err := s.conn.Ping()
-	if err != nil {
-		return err
-	}
-	return nil
+	return s.conn.Ping()
 }

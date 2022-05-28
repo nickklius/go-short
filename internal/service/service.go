@@ -30,13 +30,11 @@ func NewService() (*Service, error) {
 		if err != nil {
 			return nil, storages.ErrDBConnNotEstablished
 		}
-		break
 	case c.FileStoragePath != "":
 		s, err = storages.NewLocalStorage(c.FileStoragePath)
 		if err != nil {
 			return nil, storages.ErrLocalStorageNotCreated
 		}
-		break
 	default:
 		s = storages.NewMemoryStorage()
 	}
