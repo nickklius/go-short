@@ -18,7 +18,6 @@ func NewDatabaseStorage(dsn string) (*DatabaseStorage, error) {
 	if err != nil {
 		return nil, ErrDBConnNotEstablished
 	}
-	defer db.Close()
 
 	return &DatabaseStorage{
 		conn: db,

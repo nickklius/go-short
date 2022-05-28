@@ -26,7 +26,7 @@ func NewConfig() (Config, error) {
 	flag.StringVar(&c.ServerAddress, "a", c.ServerAddress, "Server address")
 	flag.StringVar(&c.BaseURL, "b", c.BaseURL, "Base URL")
 	flag.StringVar(&c.FileStoragePath, "f", c.FileStoragePath, "File storage path")
-	flag.StringVar(&c.DatabaseDSN, "d", c.DatabaseDSN, "PG conn address")
+	flag.StringVar(&c.DatabaseDSN, "d", c.DatabaseDSN, "DB conn string")
 	flag.Parse()
 
 	c.ShortenerCapacity = int(math.Pow(float64(len(c.Letters)), float64(c.KeyLength)))
