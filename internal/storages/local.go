@@ -73,6 +73,10 @@ func (s *LocalStorage) GetAllByUserID(userID string) map[string]URLEntry {
 	return s.data.GetAllByUserID(userID)
 }
 
+func (s *LocalStorage) Ping() error {
+	return ErrMethodNotImplemented
+}
+
 func NewFileHandler(fileName string) (*fileHandler, error) {
 	file, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE, 0777)
 	if err != nil {

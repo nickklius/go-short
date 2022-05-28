@@ -14,6 +14,7 @@ type Config struct {
 	BaseURL           string `env:"BASE_URL" envDefault:"http://localhost:8080"`
 	ServerAddress     string `env:"SERVER_ADDRESS" envDefault:":8080"`
 	FileStoragePath   string `env:"FILE_STORAGE_PATH" envDefault:"storage.json"`
+	DatabaseDSN       string `env:"DATABASE_DSN"`
 }
 
 func NewConfig() (Config, error) {
@@ -25,6 +26,7 @@ func NewConfig() (Config, error) {
 	flag.StringVar(&c.ServerAddress, "a", c.ServerAddress, "Server address")
 	flag.StringVar(&c.BaseURL, "b", c.BaseURL, "Base URL")
 	flag.StringVar(&c.FileStoragePath, "f", c.FileStoragePath, "File storage path")
+	flag.StringVar(&c.DatabaseDSN, "d", c.DatabaseDSN, "DB conn string")
 	flag.Parse()
 
 	c.ShortenerCapacity = int(math.Pow(float64(len(c.Letters)), float64(c.KeyLength)))

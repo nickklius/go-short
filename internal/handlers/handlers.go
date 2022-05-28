@@ -167,6 +167,14 @@ func (h *Handler) RetrieveUserURLs(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func (h *Handler) PingDB(w http.ResponseWriter, r *http.Request) {
+	err := h.storage.Ping()
+	if err != nil {
+		http.Error(w, err.Error(), errToStatus(err))
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
 func (h *Handler) prepareShortening(longURL, userID string) (string, error) {
 	var shortURL string
 
@@ -204,6 +212,8 @@ func errToStatus(err error) int {
 		return http.StatusNotFound
 	case storages.ErrAlreadyExists:
 		return http.StatusConflict
+	case storages.ErrMethodNotImplemented:
+		return http.StatusInternalServerError
 	default:
 		return http.StatusInternalServerError
 	}

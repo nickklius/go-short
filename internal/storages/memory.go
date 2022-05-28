@@ -63,3 +63,7 @@ func (s *MemoryStorage) GetAllByUserID(userID string) map[string]URLEntry {
 
 	return userURLs
 }
+
+func (s *MemoryStorage) Ping() error {
+	return ErrMethodNotImplemented
+}
