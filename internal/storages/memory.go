@@ -1,6 +1,7 @@
 package storages
 
 import (
+	"context"
 	"sync"
 )
 
@@ -20,7 +21,7 @@ func NewMemoryStorage() Repository {
 	}
 }
 
-func (s *MemoryStorage) Read(shortURL string) (string, error) {
+func (s *MemoryStorage) Read(ctx context.Context, shortURL string) (string, error) {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 
@@ -31,7 +32,7 @@ func (s *MemoryStorage) Read(shortURL string) (string, error) {
 	return "", ErrNotFound
 }
 
-func (s *MemoryStorage) Create(shortURL, longURL, userID string) error {
+func (s *MemoryStorage) Create(_ context.Context, shortURL, longURL, userID string) error {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 
@@ -43,25 +44,26 @@ func (s *MemoryStorage) Create(shortURL, longURL, userID string) error {
 	return nil
 }
 
-func (s *MemoryStorage) GetAll() map[string]URLEntry {
+func (s *MemoryStorage) GetAll() (map[string]URLEntry, error) {
 	s.mux.Lock()
 	defer s.mux.Unlock()
-	return s.data
+
+	return s.data, nil
 }
 
-func (s *MemoryStorage) GetAllByUserID(userID string) map[string]URLEntry {
+func (s *MemoryStorage) GetAllByUserID(_ context.Context, userID string) (map[string]string, error) {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 
-	userURLs := make(map[string]URLEntry)
+	userURLs := make(map[string]string)
 
 	for short, url := range s.data {
 		if url.UserID == userID {
-			userURLs[short] = url
+			userURLs[short] = url.URL
 		}
 	}
 
-	return userURLs
+	return userURLs, nil
 }
 
 func (s *MemoryStorage) Ping() error {

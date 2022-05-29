@@ -1,6 +1,7 @@
 package storages
 
 import (
+	"context"
 	"errors"
 )
 
@@ -13,9 +14,9 @@ var (
 )
 
 type Repository interface {
-	Create(shortURL, longURL, userID string) error
-	Read(shortURL string) (string, error)
-	GetAll() map[string]URLEntry
-	GetAllByUserID(userID string) map[string]URLEntry
+	Create(ctx context.Context, shortURL, longURL, userID string) error
+	Read(ctx context.Context, shortURL string) (string, error)
+	GetAll() (map[string]URLEntry, error)
+	GetAllByUserID(ctx context.Context, userID string) (map[string]string, error)
 	Ping() error
 }
