@@ -87,6 +87,9 @@ func (s *DatabaseStorage) GetAllByUserID(ctx context.Context, userID string) (ma
 	if err != nil {
 		return nil, err
 	}
+	if rows.Err() != nil {
+		return nil, rows.Err()
+	}
 	defer rows.Close()
 
 	for rows.Next() {
