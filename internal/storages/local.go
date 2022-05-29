@@ -1,6 +1,7 @@
 package storages
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"os"
@@ -19,7 +20,7 @@ type fileHandler struct {
 	decoder *json.Decoder
 }
 
-func NewLocalStorage(p string) (Repository, error) {
+func NewLocalStorage(ctx context.Context, p string) (Repository, error) {
 	s := NewMemoryStorage()
 
 	f, err := NewFileHandler(p)
@@ -28,7 +29,7 @@ func NewLocalStorage(p string) (Repository, error) {
 	}
 	defer f.Close()
 
-	err = f.Read(s)
+	err = f.Read(ctx, s)
 	if (err != io.EOF) && (err != nil) {
 		return nil, err
 	}
@@ -39,11 +40,11 @@ func NewLocalStorage(p string) (Repository, error) {
 	}, nil
 }
 
-func (s *LocalStorage) Read(shortURL string) (string, error) {
-	return s.data.Read(shortURL)
+func (s *LocalStorage) Read(ctx context.Context, shortURL string) (string, error) {
+	return s.data.Read(ctx, shortURL)
 }
 
-func (s *LocalStorage) Create(shortURL, longURL, userID string) error {
+func (s *LocalStorage) Create(ctx context.Context, shortURL, longURL, userID string) error {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 
@@ -53,7 +54,7 @@ func (s *LocalStorage) Create(shortURL, longURL, userID string) error {
 	}
 	defer f.Close()
 
-	err = s.data.Create(shortURL, longURL, userID)
+	err = s.data.Create(ctx, shortURL, longURL, userID)
 	if err != nil {
 		return err
 	}
@@ -65,12 +66,12 @@ func (s *LocalStorage) Create(shortURL, longURL, userID string) error {
 	return nil
 }
 
-func (s *LocalStorage) GetAll() map[string]URLEntry {
+func (s *LocalStorage) GetAll() (map[string]URLEntry, error) {
 	return s.data.GetAll()
 }
 
-func (s *LocalStorage) GetAllByUserID(userID string) map[string]URLEntry {
-	return s.data.GetAllByUserID(userID)
+func (s *LocalStorage) GetAllByUserID(ctx context.Context, userID string) (map[string]string, error) {
+	return s.data.GetAllByUserID(ctx, userID)
 }
 
 func (s *LocalStorage) Ping() error {
@@ -95,14 +96,19 @@ func (f *fileHandler) Close() {
 }
 
 func (f *fileHandler) Save(s Repository) error {
-	err := f.encoder.Encode(s.GetAll())
+	data, err := s.GetAll()
+	if err != nil {
+		return err
+	}
+
+	err = f.encoder.Encode(data)
 	if err != nil {
 		return err
 	}
 	return f.file.Sync()
 }
 
-func (f *fileHandler) Read(s Repository) error {
+func (f *fileHandler) Read(ctx context.Context, s Repository) error {
 	m := make(map[string]URLEntry)
 	err := f.decoder.Decode(&m)
 	if err != nil {
@@ -110,7 +116,7 @@ func (f *fileHandler) Read(s Repository) error {
 	}
 
 	for k, v := range m {
-		err = s.Create(k, v.URL, v.UserID)
+		err = s.Create(ctx, k, v.URL, v.UserID)
 		if err != nil {
 			return err
 		}

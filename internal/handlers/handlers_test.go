@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"io/ioutil"
 	"log"
@@ -52,7 +53,7 @@ func TestRetrieveHandler(t *testing.T) {
 	s := storages.NewMemoryStorage()
 	h := NewHandler(s, c)
 
-	if err := h.storage.Create("5fbbd", "https://yandex.ru", ""); err != nil {
+	if err := h.storage.Create(context.Background(), "5fbbd", "https://yandex.ru", ""); err != nil {
 		log.Fatal(err)
 	}
 

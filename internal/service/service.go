@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -16,7 +17,7 @@ type Service struct {
 	Conf    config.Config
 }
 
-func NewService() (*Service, error) {
+func NewService(ctx context.Context) (*Service, error) {
 	var s storages.Repository
 
 	c, err := config.NewConfig()
@@ -26,12 +27,12 @@ func NewService() (*Service, error) {
 
 	switch {
 	case c.DatabaseDSN != "":
-		s, err = storages.NewDatabaseStorage(c.DatabaseDSN)
+		s, err = storages.NewDatabaseStorage(ctx, c.DatabaseDSN)
 		if err != nil {
 			return nil, storages.ErrDBConnNotEstablished
 		}
 	case c.FileStoragePath != "":
-		s, err = storages.NewLocalStorage(c.FileStoragePath)
+		s, err = storages.NewLocalStorage(ctx, c.FileStoragePath)
 		if err != nil {
 			return nil, storages.ErrLocalStorageNotCreated
 		}

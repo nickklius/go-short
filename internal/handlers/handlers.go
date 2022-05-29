@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -26,6 +27,11 @@ type Handler struct {
 	config  config.Config
 }
 
+type result struct {
+	ShortURL    string `json:"short_url"`
+	OriginalURL string `json:"original_url"`
+}
+
 func NewHandler(s storages.Repository, c config.Config) *Handler {
 	return &Handler{
 		storage: s,
@@ -47,7 +53,7 @@ func (h *Handler) ShortenHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shortURL, err := h.prepareShortening(string(b), userID)
+	shortURL, err := h.prepareShortening(r.Context(), string(b), userID)
 	if err != nil {
 		http.Error(w, err.Error(), errToStatus(err))
 		return
@@ -80,7 +86,7 @@ func (h *Handler) ShortenJSONHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shortURL, err := h.prepareShortening(u.URL, userID)
+	shortURL, err := h.prepareShortening(r.Context(), u.URL, userID)
 	if err != nil {
 		http.Error(w, err.Error(), errToStatus(err))
 		return
@@ -111,7 +117,7 @@ func (h *Handler) ShortenJSONHandler(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) RetrieveHandler(w http.ResponseWriter, r *http.Request) {
 	shortURL := chi.URLParam(r, "id")
-	longURL, err := h.storage.Read(shortURL)
+	longURL, err := h.storage.Read(r.Context(), shortURL)
 
 	if err == nil {
 		http.Redirect(w, r, longURL, http.StatusTemporaryRedirect)
@@ -136,17 +142,21 @@ func (h *Handler) RetrieveUserURLs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	urls := h.storage.GetAllByUserID(userID)
+	urls, err := h.storage.GetAllByUserID(r.Context(), userID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	if len(urls) == 0 {
 		http.Error(w, "", http.StatusNoContent)
 		return
 	}
 
-	for short, urlEntry := range urls {
+	for short, long := range urls {
 		response = append(response, result{
 			ShortURL:    h.config.BaseURL + "/" + short,
-			OriginalURL: urlEntry.URL})
+			OriginalURL: long})
 	}
 
 	buf := new(bytes.Buffer)
@@ -175,7 +185,7 @@ func (h *Handler) PingDB(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *Handler) prepareShortening(longURL, userID string) (string, error) {
+func (h *Handler) prepareShortening(ctx context.Context, longURL, userID string) (string, error) {
 	var shortURL string
 
 	_, err := url.ParseRequestURI(longURL)
@@ -185,7 +195,7 @@ func (h *Handler) prepareShortening(longURL, userID string) (string, error) {
 
 	for i := 0; i < h.config.ShortenerCapacity; i++ {
 		shortURL = utils.GenerateKey(h.config.Letters, h.config.KeyLength)
-		err = h.storage.Create(shortURL, longURL, userID)
+		err = h.storage.Create(ctx, shortURL, longURL, userID)
 		if err != storages.ErrAlreadyExists {
 			break
 		}
