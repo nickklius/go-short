@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -12,6 +13,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/nickklius/go-short/internal/config"
 	"github.com/nickklius/go-short/internal/middleware"
+	"github.com/nickklius/go-short/internal/model"
 	"github.com/nickklius/go-short/internal/storages"
 	"github.com/nickklius/go-short/internal/utils"
 )
@@ -25,11 +27,6 @@ var (
 type Handler struct {
 	storage storages.Repository
 	config  config.Config
-}
-
-type result struct {
-	ShortURL    string `json:"short_url"`
-	OriginalURL string `json:"original_url"`
 }
 
 func NewHandler(s storages.Repository, c config.Config) *Handler {
@@ -115,6 +112,56 @@ func (h *Handler) ShortenJSONHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (h *Handler) ShortenJSONBatchHandler(w http.ResponseWriter, r *http.Request) {
+	var urls []model.URLBatchRequest
+	var result []model.URLBatchResponse
+
+	dec := json.NewDecoder(r.Body)
+	err := dec.Decode(&urls)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	err = middleware.GetCurrentUserID(r, &userID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	for _, u := range urls {
+		fmt.Println(u)
+		shortURL, err := h.prepareShortening(r.Context(), u.OriginalURL, userID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		response := model.URLBatchResponse{
+			CorrelationID: u.CorrelationID,
+			ShortURL:      h.config.BaseURL + "/" + shortURL,
+		}
+
+		result = append(result, response)
+	}
+
+	buf := new(bytes.Buffer)
+	enc := json.NewEncoder(buf)
+	err = enc.Encode(result)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Add("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(http.StatusCreated)
+	_, err = w.Write(buf.Bytes())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
 func (h *Handler) RetrieveHandler(w http.ResponseWriter, r *http.Request) {
 	shortURL := chi.URLParam(r, "id")
 	longURL, err := h.storage.Read(r.Context(), shortURL)
@@ -174,7 +221,6 @@ func (h *Handler) RetrieveUserURLs(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
 }
 
 func (h *Handler) PingDB(w http.ResponseWriter, r *http.Request) {
