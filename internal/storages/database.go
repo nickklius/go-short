@@ -3,6 +3,8 @@ package storages
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"fmt"
 	"sync"
 
 	_ "github.com/jackc/pgx/stdlib"
@@ -57,11 +59,22 @@ func (s *DatabaseStorage) Create(ctx context.Context, shortURL, longURL, userID 
 	s.mux.Lock()
 	defer s.mux.Unlock()
 
-	createQuery := "INSERT INTO urls (user_id, short, url) VALUES($1, $2, $3)"
-	_, err := s.conn.ExecContext(ctx, createQuery, userID, shortURL, longURL)
+	checkShortViolation := shortURL
+
+	createQuery := `INSERT INTO urls 
+						(user_id, short, url) 
+						VALUES($1, $2, $3) 
+					ON CONFLICT (url) DO UPDATE SET 
+					    url = $3
+					RETURNING short`
+	err := s.conn.QueryRowContext(ctx, createQuery, userID, shortURL, longURL).Scan(&checkShortViolation)
 
 	if err != nil {
 		return err
+	}
+
+	if checkShortViolation != shortURL {
+		return NewInsertURLUniqError(checkShortViolation, errors.New("duplicate url"))
 	}
 
 	return nil
@@ -115,9 +128,29 @@ func (s *DatabaseStorage) createTables(ctx context.Context) error {
 		id bigserial PRIMARY KEY,
 		user_id text not null,
 		short text not null UNIQUE,
-		url text not null 
+		url text not null UNIQUE
 	);`
 
 	_, err := s.conn.ExecContext(ctx, query)
 	return err
+}
+
+type InsertURLUniqError struct {
+	ShortURL string
+	Err      error
+}
+
+func (e *InsertURLUniqError) Error() string {
+	return fmt.Sprintf("%v: %v", e.ShortURL, e.Err)
+}
+
+func (e *InsertURLUniqError) Unwrap() error {
+	return e.Err
+}
+
+func NewInsertURLUniqError(shortURL string, err error) error {
+	return &InsertURLUniqError{
+		ShortURL: shortURL,
+		Err:      err,
+	}
 }

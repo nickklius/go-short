@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -51,6 +50,19 @@ func (h *Handler) ShortenHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	shortURL, err := h.prepareShortening(r.Context(), string(b), userID)
+
+	var e *storages.InsertURLUniqError
+
+	if errors.As(err, &e) {
+		w.WriteHeader(http.StatusConflict)
+		_, err = w.Write([]byte(h.config.BaseURL + "/" + e.ShortURL))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		return
+	}
+
 	if err != nil {
 		http.Error(w, err.Error(), errToStatus(err))
 		return
@@ -66,6 +78,10 @@ func (h *Handler) ShortenHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ShortenJSONHandler(w http.ResponseWriter, r *http.Request) {
+	type result struct {
+		Result string `json:"result"`
+	}
+
 	u := struct {
 		URL string `json:"url"`
 	}{}
@@ -84,20 +100,36 @@ func (h *Handler) ShortenJSONHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	shortURL, err := h.prepareShortening(r.Context(), u.URL, userID)
+
 	if err != nil {
+		var e *storages.InsertURLUniqError
+
+		if errors.As(err, &e) {
+			buf := new(bytes.Buffer)
+			enc := json.NewEncoder(buf)
+			err = enc.Encode(result{Result: h.config.BaseURL + "/" + e.ShortURL})
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			w.Header().Add("Content-Type", "application/json; charset=utf-8")
+			w.WriteHeader(http.StatusConflict)
+			_, err = w.Write(buf.Bytes())
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			return
+		}
+
 		http.Error(w, err.Error(), errToStatus(err))
 		return
 	}
 
-	result := struct {
-		Result string `json:"result"`
-	}{
-		Result: h.config.BaseURL + "/" + shortURL,
-	}
-
 	buf := new(bytes.Buffer)
 	enc := json.NewEncoder(buf)
-	err = enc.Encode(result)
+	err = enc.Encode(result{Result: h.config.BaseURL + "/" + shortURL})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -130,7 +162,6 @@ func (h *Handler) ShortenJSONBatchHandler(w http.ResponseWriter, r *http.Request
 	}
 
 	for _, u := range urls {
-		fmt.Println(u)
 		shortURL, err := h.prepareShortening(r.Context(), u.OriginalURL, userID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
