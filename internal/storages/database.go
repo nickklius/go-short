@@ -5,13 +5,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"sync"
 
 	_ "github.com/jackc/pgx/stdlib"
 )
 
 type DatabaseStorage struct {
-	mux  sync.Mutex
 	conn *sql.DB
 }
 
@@ -35,30 +33,23 @@ func NewDatabaseStorage(ctx context.Context, dsn string) (*DatabaseStorage, erro
 }
 
 func (s *DatabaseStorage) Read(ctx context.Context, shortURL string) (string, error) {
-	s.mux.Lock()
-	defer s.mux.Unlock()
+	readQuery := `SELECT url FROM urls WHERE short = $1`
+	row := s.conn.QueryRowContext(ctx, readQuery, shortURL)
 
 	var longURL string
 
-	readQuery := "SELECT url FROM urls WHERE short = $1"
-	row := s.conn.QueryRowContext(ctx, readQuery, shortURL)
-
 	err := row.Scan(&longURL)
+	if err == sql.ErrNoRows {
+		return "", ErrNotFound
+	}
 	if err != nil {
 		return "", err
-	}
-
-	if longURL == "" {
-		return "", ErrNotFound
 	}
 
 	return longURL, nil
 }
 
 func (s *DatabaseStorage) Create(ctx context.Context, shortURL, longURL, userID string) error {
-	s.mux.Lock()
-	defer s.mux.Unlock()
-
 	checkShortViolation := shortURL
 
 	createQuery := `INSERT INTO urls 
@@ -68,7 +59,6 @@ func (s *DatabaseStorage) Create(ctx context.Context, shortURL, longURL, userID 
 					    url = $3
 					RETURNING short`
 	err := s.conn.QueryRowContext(ctx, createQuery, userID, shortURL, longURL).Scan(&checkShortViolation)
-
 	if err != nil {
 		return err
 	}
@@ -85,9 +75,6 @@ func (s *DatabaseStorage) GetAll() (map[string]URLEntry, error) {
 }
 
 func (s *DatabaseStorage) GetAllByUserID(ctx context.Context, userID string) (map[string]string, error) {
-	s.mux.Lock()
-	defer s.mux.Unlock()
-
 	type result struct {
 		ShortURL    string `json:"short_url"`
 		OriginalURL string `json:"original_url"`
@@ -95,7 +82,7 @@ func (s *DatabaseStorage) GetAllByUserID(ctx context.Context, userID string) (ma
 
 	userURLs := make(map[string]string)
 
-	getQuery := "SELECT short, url FROM urls WHERE user_id=$1"
+	getQuery := `SELECT short, url FROM urls WHERE user_id=$1`
 	rows, err := s.conn.QueryContext(ctx, getQuery, userID)
 	if err != nil {
 		return nil, err

@@ -20,7 +20,6 @@ import (
 var (
 	ErrWrongURLFormat = errors.New("wrong format")
 	ErrOverCapacity   = errors.New("shortener capacity is over")
-	userID            string
 )
 
 type Handler struct {
@@ -43,7 +42,7 @@ func (h *Handler) ShortenHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = middleware.GetCurrentUserID(r, &userID)
+	userID, err := middleware.GetCurrentUserID(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -93,38 +92,25 @@ func (h *Handler) ShortenJSONHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = middleware.GetCurrentUserID(r, &userID)
+	userID, err := middleware.GetCurrentUserID(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	shortURL, err := h.prepareShortening(r.Context(), u.URL, userID)
+	respHttpStatus := http.StatusCreated
 
+	shortURL, err := h.prepareShortening(r.Context(), u.URL, userID)
 	if err != nil {
 		var e *storages.InsertURLUniqError
 
 		if errors.As(err, &e) {
-			buf := new(bytes.Buffer)
-			enc := json.NewEncoder(buf)
-			err = enc.Encode(result{Result: h.config.BaseURL + "/" + e.ShortURL})
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-
-			w.Header().Add("Content-Type", "application/json; charset=utf-8")
-			w.WriteHeader(http.StatusConflict)
-			_, err = w.Write(buf.Bytes())
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
+			shortURL = e.ShortURL
+			respHttpStatus = http.StatusConflict
+		} else {
+			http.Error(w, err.Error(), errToStatus(err))
 			return
 		}
-
-		http.Error(w, err.Error(), errToStatus(err))
-		return
 	}
 
 	buf := new(bytes.Buffer)
@@ -136,7 +122,7 @@ func (h *Handler) ShortenJSONHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Add("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(http.StatusCreated)
+	w.WriteHeader(respHttpStatus)
 	_, err = w.Write(buf.Bytes())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -146,7 +132,6 @@ func (h *Handler) ShortenJSONHandler(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) ShortenJSONBatchHandler(w http.ResponseWriter, r *http.Request) {
 	var urls []model.URLBatchRequest
-	var result []model.URLBatchResponse
 
 	dec := json.NewDecoder(r.Body)
 	err := dec.Decode(&urls)
@@ -155,11 +140,13 @@ func (h *Handler) ShortenJSONBatchHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	err = middleware.GetCurrentUserID(r, &userID)
+	userID, err := middleware.GetCurrentUserID(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	result := make([]model.URLBatchResponse, 0, len(urls))
 
 	for _, u := range urls {
 		shortURL, err := h.prepareShortening(r.Context(), u.OriginalURL, userID)
@@ -214,7 +201,7 @@ func (h *Handler) RetrieveUserURLs(w http.ResponseWriter, r *http.Request) {
 
 	var response []result
 
-	err := middleware.GetCurrentUserID(r, &userID)
+	userID, err := middleware.GetCurrentUserID(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -254,7 +241,7 @@ func (h *Handler) RetrieveUserURLs(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *Handler) PingDB(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) PingDB(w http.ResponseWriter, _ *http.Request) {
 	err := h.storage.Ping()
 	if err != nil {
 		http.Error(w, err.Error(), errToStatus(err))
@@ -300,7 +287,7 @@ func errToStatus(err error) int {
 	case storages.ErrAlreadyExists:
 		return http.StatusConflict
 	case storages.ErrMethodNotImplemented:
-		return http.StatusInternalServerError
+		return http.StatusNotImplemented
 	default:
 		return http.StatusInternalServerError
 	}

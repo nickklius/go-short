@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"io"
 	"net/http"
+	"sync"
 
 	"github.com/google/uuid"
 )
@@ -17,42 +18,50 @@ type CookieHandler struct {
 }
 
 var (
-	ch                    *CookieHandler
+	ch                    CookieHandler
+	once                  sync.Once
+	cookieInitErr         error
 	cookieUserIDFieldName = "user_id"
 	secretKey             = "Do you see the gopher? No. Me neither. But he is exist."
 )
 
-func NewCookieHandler() error {
-	if ch == nil {
+func NewCookieHandler() (CookieHandler, error) {
+	once.Do(func() {
 		key := sha256.Sum256([]byte(secretKey))
-		aesblock, err := aes.NewCipher(key[:])
-		if err != nil {
-			return err
+
+		var aesblock cipher.Block
+		aesblock, cookieInitErr = aes.NewCipher(key[:])
+		if cookieInitErr != nil {
+			return
 		}
-		aesgcm, err := cipher.NewGCM(aesblock)
-		if err != nil {
-			return err
+
+		var aesgcm cipher.AEAD
+		aesgcm, cookieInitErr = cipher.NewGCM(aesblock)
+		if cookieInitErr != nil {
+			return
 		}
 		nonce := key[len(key)-aesgcm.NonceSize():]
 
-		ch = &CookieHandler{
+		ch = CookieHandler{
 			aesgcm: aesgcm,
 			nonce:  nonce,
 		}
-	}
+	})
 
-	return nil
+	return ch, cookieInitErr
 }
 
 func UserID(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		userID := uuid.New().String()
-
-		err := GetCurrentUserID(r, &userID)
+		userID, err := GetCurrentUserID(r)
 
 		if err != nil && err != http.ErrNoCookie {
 			io.WriteString(w, err.Error())
 			return
+		}
+
+		if userID == "" {
+			userID = uuid.New().String()
 		}
 
 		enc, err := Encode(userID)
@@ -74,22 +83,23 @@ func UserID(next http.Handler) http.Handler {
 	})
 }
 
-func GetCurrentUserID(r *http.Request, userID *string) error {
+func GetCurrentUserID(r *http.Request) (string, error) {
 	cookieUserID, err := r.Cookie(cookieUserIDFieldName)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	err = Decode(cookieUserID.Value, userID)
+	var userID string
+	err = Decode(cookieUserID.Value, &userID)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	return nil
+	return userID, nil
 }
 
 func Decode(encUserID string, userID *string) error {
-	err := NewCookieHandler()
+	c, err := NewCookieHandler()
 	if err != nil {
 		return err
 	}
@@ -99,7 +109,7 @@ func Decode(encUserID string, userID *string) error {
 		return err
 	}
 
-	src, err := ch.aesgcm.Open(nil, ch.nonce, dst, nil)
+	src, err := c.aesgcm.Open(nil, c.nonce, dst, nil)
 	if err != nil {
 		return err
 	}
@@ -109,12 +119,12 @@ func Decode(encUserID string, userID *string) error {
 }
 
 func Encode(userID string) (string, error) {
-	err := NewCookieHandler()
+	c, err := NewCookieHandler()
 	if err != nil {
 		return "", nil
 	}
 
 	src := []byte(userID)
-	enc := ch.aesgcm.Seal(nil, ch.nonce, src, nil)
+	enc := c.aesgcm.Seal(nil, c.nonce, src, nil)
 	return hex.EncodeToString(enc), nil
 }
