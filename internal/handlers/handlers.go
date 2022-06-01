@@ -98,7 +98,7 @@ func (h *Handler) ShortenJSONHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respHttpStatus := http.StatusCreated
+	respHTTPStatus := http.StatusCreated
 
 	shortURL, err := h.prepareShortening(r.Context(), u.URL, userID)
 	if err != nil {
@@ -106,7 +106,7 @@ func (h *Handler) ShortenJSONHandler(w http.ResponseWriter, r *http.Request) {
 
 		if errors.As(err, &e) {
 			shortURL = e.ShortURL
-			respHttpStatus = http.StatusConflict
+			respHTTPStatus = http.StatusConflict
 		} else {
 			http.Error(w, err.Error(), errToStatus(err))
 			return
@@ -122,7 +122,7 @@ func (h *Handler) ShortenJSONHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Add("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(respHttpStatus)
+	w.WriteHeader(respHTTPStatus)
 	_, err = w.Write(buf.Bytes())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
