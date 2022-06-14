@@ -5,12 +5,22 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
+	"time"
 
 	_ "github.com/jackc/pgx/stdlib"
+	"github.com/nickklius/go-short/internal/config"
+	"github.com/nickklius/go-short/internal/model"
 )
 
 type DatabaseStorage struct {
-	conn *sql.DB
+	conn   *sql.DB
+	worker *Worker
+}
+
+type Worker struct {
+	input chan model.URLBatchDelete
+	done  chan struct{}
 }
 
 type URL struct {
@@ -18,15 +28,16 @@ type URL struct {
 	isDeleted bool
 }
 
-func NewDatabaseStorage(ctx context.Context, dsn string) (*DatabaseStorage, error) {
-	db, err := sql.Open("pgx", dsn)
+func NewDatabaseStorage(ctx context.Context, c config.Config) (*DatabaseStorage, error) {
+	db, err := sql.Open("pgx", c.DatabaseDSN)
 
 	if err != nil {
 		return nil, ErrDBConnNotEstablished
 	}
 
 	s := &DatabaseStorage{
-		conn: db,
+		conn:   db,
+		worker: NewWorker(),
 	}
 
 	err = s.createTables(ctx)
@@ -34,7 +45,16 @@ func NewDatabaseStorage(ctx context.Context, dsn string) (*DatabaseStorage, erro
 		return nil, err
 	}
 
+	go s.worker.pushBatchToDB(ctx, s, c)
+
 	return s, nil
+}
+
+func NewWorker() *Worker {
+	return &Worker{
+		input: make(chan model.URLBatchDelete),
+		done:  make(chan struct{}),
+	}
 }
 
 func (s *DatabaseStorage) Read(ctx context.Context, shortURL string) (string, error) {
@@ -84,7 +104,9 @@ func (s *DatabaseStorage) GetAll() (map[string]URLEntry, error) {
 	return nil, ErrMethodNotImplemented
 }
 
-func (s *DatabaseStorage) UpdateURLInBatchMode(ctx context.Context, urls []string, userID string) error {
+func (s *DatabaseStorage) deleteURL(ctx context.Context, urls []model.URLBatchDelete) error {
+	fmt.Println("delete sql with ", len(urls), " rows")
+
 	tx, err := s.conn.Begin()
 	if err != nil {
 		return err
@@ -97,7 +119,7 @@ func (s *DatabaseStorage) UpdateURLInBatchMode(ctx context.Context, urls []strin
 	}
 
 	for _, u := range urls {
-		if _, err = stmt.Exec(userID, u); err != nil {
+		if _, err = stmt.Exec(u.UserID, u.ShortURL); err != nil {
 			if err = tx.Rollback(); err != nil {
 				return err
 			}
@@ -109,6 +131,12 @@ func (s *DatabaseStorage) UpdateURLInBatchMode(ctx context.Context, urls []strin
 		return err
 	}
 	return nil
+}
+
+func (s *DatabaseStorage) UpdateURLInBatchMode(_ context.Context, userID string, urls []string) {
+	for _, u := range urls {
+		s.worker.input <- model.URLBatchDelete{ShortURL: u, UserID: userID}
+	}
 }
 
 func (s *DatabaseStorage) GetAllByUserID(ctx context.Context, userID string) (map[string]string, error) {
@@ -177,5 +205,48 @@ func NewInsertURLUniqError(shortURL string, err error) error {
 	return &InsertURLUniqError{
 		ShortURL: shortURL,
 		Err:      err,
+	}
+}
+
+func (w *Worker) pushBatchToDB(ctx context.Context, s *DatabaseStorage, c config.Config) {
+	flush := func() {
+		for {
+			time.Sleep(time.Duration(c.DeleteFlushTimeoutInSeconds) * time.Second)
+			w.done <- struct{}{}
+		}
+	}
+
+	go flush()
+
+	buffer := make([]model.URLBatchDelete, c.DeleteBufferSize)
+
+	var i int
+
+	for {
+		select {
+		case <-w.done:
+			if i > 0 {
+				err := s.deleteURL(ctx, buffer[:i])
+				if err != nil {
+					log.Println("", err)
+				}
+				i = 0
+			}
+		case u, ok := <-w.input:
+			if !ok {
+				return
+			}
+
+			buffer[i] = u
+			i++
+
+			if i == len(buffer) {
+				err := s.deleteURL(ctx, buffer)
+				if err != nil {
+					log.Println("", err)
+				}
+				i = 0
+			}
+		}
 	}
 }

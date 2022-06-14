@@ -27,7 +27,7 @@ func NewService(ctx context.Context) (*Service, error) {
 
 	switch {
 	case c.DatabaseDSN != "":
-		s, err = storages.NewDatabaseStorage(ctx, c.DatabaseDSN)
+		s, err = storages.NewDatabaseStorage(ctx, c)
 		if err != nil {
 			return nil, storages.ErrDBConnNotEstablished
 		}

@@ -21,7 +21,7 @@ func NewMemoryStorage() Repository {
 	}
 }
 
-func (s *MemoryStorage) Read(ctx context.Context, shortURL string) (string, error) {
+func (s *MemoryStorage) Read(_ context.Context, shortURL string) (string, error) {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 
@@ -70,6 +70,4 @@ func (s *MemoryStorage) Ping() error {
 	return ErrMethodNotImplemented
 }
 
-func (s *MemoryStorage) UpdateURLInBatchMode(_ context.Context, _ []string, _ string) error {
-	return ErrMethodNotImplemented
-}
+func (s *MemoryStorage) UpdateURLInBatchMode(_ context.Context, _ string, _ []string) {}

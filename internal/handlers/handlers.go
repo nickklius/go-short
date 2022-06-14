@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -267,23 +266,9 @@ func (h *Handler) DeleteURLs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	errCh := make(chan error)
-
-	go func(errCh chan error) {
-		defer close(errCh)
-
-		err := h.storage.UpdateURLInBatchMode(r.Context(), urls, userID)
-		if err != nil {
-			errCh <- fmt.Errorf("update url in batch mode error: %w", err)
-			return
-		}
-	}(errCh)
-
-	err = <-errCh
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	go func() {
+		h.storage.UpdateURLInBatchMode(r.Context(), userID, urls)
+	}()
 
 	w.WriteHeader(http.StatusAccepted)
 }

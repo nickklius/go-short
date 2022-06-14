@@ -78,9 +78,7 @@ func (s *LocalStorage) Ping() error {
 	return ErrMethodNotImplemented
 }
 
-func (s *LocalStorage) UpdateURLInBatchMode(_ context.Context, _ []string, _ string) error {
-	return ErrMethodNotImplemented
-}
+func (s *LocalStorage) UpdateURLInBatchMode(_ context.Context, _ string, _ []string) {}
 
 func NewFileHandler(fileName string) (*fileHandler, error) {
 	file, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE, 0777)
