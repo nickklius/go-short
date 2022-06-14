@@ -69,3 +69,7 @@ func (s *MemoryStorage) GetAllByUserID(_ context.Context, userID string) (map[st
 func (s *MemoryStorage) Ping() error {
 	return ErrMethodNotImplemented
 }
+
+func (s *MemoryStorage) UpdateURLInBatchMode(_ context.Context, _ []string, _ string) error {
+	return ErrMethodNotImplemented
+}

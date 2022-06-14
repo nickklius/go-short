@@ -75,6 +75,7 @@ func (s *Service) Router(h *handlers.Handler) chi.Router {
 		r.Post("/", h.ShortenHandler)
 		r.Post("/api/shorten", h.ShortenJSONHandler)
 		r.Post("/api/shorten/batch", h.ShortenJSONBatchHandler)
+		r.Delete("/api/user/urls", h.DeleteURLs)
 	})
 
 	return r

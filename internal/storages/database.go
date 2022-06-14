@@ -53,7 +53,7 @@ func (s *DatabaseStorage) Create(ctx context.Context, shortURL, longURL, userID 
 	checkShortViolation := shortURL
 
 	createQuery := `INSERT INTO urls 
-						(user_id, short, url) 
+						(user_id, short, url) 	
 						VALUES($1, $2, $3) 
 					ON CONFLICT (url) DO UPDATE SET 
 					    url = $3
@@ -72,6 +72,33 @@ func (s *DatabaseStorage) Create(ctx context.Context, shortURL, longURL, userID 
 
 func (s *DatabaseStorage) GetAll() (map[string]URLEntry, error) {
 	return nil, ErrMethodNotImplemented
+}
+
+func (s *DatabaseStorage) UpdateURLInBatchMode(ctx context.Context, urls []string, userID string) error {
+	tx, err := s.conn.Begin()
+	if err != nil {
+		return err
+	}
+
+	stmt, err := tx.PrepareContext(ctx, `UPDATE urls SET deleted = true WHERE user_id = $1
+									AND short = $2`)
+	if err != nil {
+		return err
+	}
+
+	for _, u := range urls {
+		if _, err = stmt.Exec(userID, u); err != nil {
+			if err = tx.Rollback(); err != nil {
+				return err
+			}
+			return err
+		}
+	}
+
+	if err = tx.Commit(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (s *DatabaseStorage) GetAllByUserID(ctx context.Context, userID string) (map[string]string, error) {
@@ -115,7 +142,8 @@ func (s *DatabaseStorage) createTables(ctx context.Context) error {
 		id bigserial PRIMARY KEY,
 		user_id text not null,
 		short text not null UNIQUE,
-		url text not null UNIQUE
+		url text not null UNIQUE,
+		deleted boolean not null default false              
 	);`
 
 	_, err := s.conn.ExecContext(ctx, query)

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -247,6 +248,44 @@ func (h *Handler) PingDB(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, err.Error(), errToStatus(err))
 	}
 	w.WriteHeader(http.StatusOK)
+}
+
+func (h *Handler) DeleteURLs(w http.ResponseWriter, r *http.Request) {
+	var urls []string
+
+	userID, err := middleware.GetCurrentUserID(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	dec := json.NewDecoder(r.Body)
+	err = dec.Decode(&urls)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	errCh := make(chan error)
+
+	go func(errCh chan error) {
+		defer close(errCh)
+
+		err := h.storage.UpdateURLInBatchMode(r.Context(), urls, userID)
+		if err != nil {
+			errCh <- fmt.Errorf("update url in batch mode error: %w", err)
+			return
+		}
+	}(errCh)
+
+	err = <-errCh
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusAccepted)
 }
 
 func (h *Handler) prepareShortening(ctx context.Context, longURL, userID string) (string, error) {
