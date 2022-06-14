@@ -9,8 +9,3 @@ type URLBatchResponse struct {
 	CorrelationID string `json:"correlation_id"`
 	ShortURL      string `json:"short_url"`
 }
-
-type URLBatchDelete struct {
-	ShortID string
-	UserID  string
-}

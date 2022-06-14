@@ -323,6 +323,8 @@ func errToStatus(err error) int {
 		return http.StatusInternalServerError
 	case storages.ErrNotFound:
 		return http.StatusNotFound
+	case storages.ErrURLIsDeleted:
+		return http.StatusGone
 	case storages.ErrAlreadyExists:
 		return http.StatusConflict
 	case storages.ErrMethodNotImplemented:

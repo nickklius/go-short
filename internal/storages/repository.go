@@ -7,6 +7,7 @@ import (
 
 var (
 	ErrNotFound               = errors.New("not found")
+	ErrURLIsDeleted           = errors.New("requested url is deleted")
 	ErrAlreadyExists          = errors.New("key already exist")
 	ErrDBConnNotEstablished   = errors.New("couldn't create DB connection")
 	ErrLocalStorageNotCreated = errors.New("couldn't create local storage file")

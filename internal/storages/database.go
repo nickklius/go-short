@@ -13,6 +13,11 @@ type DatabaseStorage struct {
 	conn *sql.DB
 }
 
+type URL struct {
+	longURL   string
+	isDeleted bool
+}
+
 func NewDatabaseStorage(ctx context.Context, dsn string) (*DatabaseStorage, error) {
 	db, err := sql.Open("pgx", dsn)
 
@@ -33,27 +38,32 @@ func NewDatabaseStorage(ctx context.Context, dsn string) (*DatabaseStorage, erro
 }
 
 func (s *DatabaseStorage) Read(ctx context.Context, shortURL string) (string, error) {
-	readQuery := `SELECT url FROM urls WHERE short = $1`
+	readQuery := `SELECT url, deleted FROM urls WHERE short = $1`
 	row := s.conn.QueryRowContext(ctx, readQuery, shortURL)
 
-	var longURL string
+	var u URL
 
-	err := row.Scan(&longURL)
+	err := row.Scan(&u.longURL, &u.isDeleted)
 	if err == sql.ErrNoRows {
 		return "", ErrNotFound
 	}
+
 	if err != nil {
 		return "", err
 	}
 
-	return longURL, nil
+	if u.isDeleted {
+		return "", ErrURLIsDeleted
+	}
+
+	return u.longURL, nil
 }
 
 func (s *DatabaseStorage) Create(ctx context.Context, shortURL, longURL, userID string) error {
 	checkShortViolation := shortURL
 
 	createQuery := `INSERT INTO urls 
-						(user_id, short, url) 	
+						(user_id, short, url) 
 						VALUES($1, $2, $3) 
 					ON CONFLICT (url) DO UPDATE SET 
 					    url = $3
