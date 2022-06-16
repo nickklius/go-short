@@ -262,13 +262,11 @@ func (h *Handler) DeleteURLs(w http.ResponseWriter, r *http.Request) {
 	err = dec.Decode(&urls)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	go func() {
-		h.storage.UpdateURLInBatchMode(r.Context(), userID, urls)
-	}()
+	go h.storage.UpdateURLInBatchMode(r.Context(), userID, urls)
 
 	w.WriteHeader(http.StatusAccepted)
 }

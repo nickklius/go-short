@@ -16,7 +16,7 @@ type Config struct {
 	FileStoragePath             string `env:"FILE_STORAGE_PATH" envDefault:"storage.json"`
 	DatabaseDSN                 string `env:"DATABASE_DSN"`
 	DeleteBufferSize            int    `env:"DELETE_BUFFER_SIZE" envDefault:"5"`
-	DeleteFlushTimeoutInSeconds int    `env:"DELETE_FLUSH_TIMEOUT" envDefault:"1"`
+	DeleteFlushTimeoutInSeconds int    `env:"DELETE_FLUSH_TIMEOUT" envDefault:"100"`
 }
 
 func NewConfig() (Config, error) {

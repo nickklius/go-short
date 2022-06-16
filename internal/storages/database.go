@@ -15,15 +15,15 @@ import (
 
 type DatabaseStorage struct {
 	conn   *sql.DB
-	worker *Worker
+	worker *worker
 }
 
-type Worker struct {
+type worker struct {
 	input chan model.URLBatchDelete
 	done  chan struct{}
 }
 
-type URL struct {
+type url struct {
 	longURL   string
 	isDeleted bool
 }
@@ -37,7 +37,7 @@ func NewDatabaseStorage(ctx context.Context, c config.Config) (*DatabaseStorage,
 
 	s := &DatabaseStorage{
 		conn:   db,
-		worker: NewWorker(),
+		worker: newWorker(),
 	}
 
 	err = s.createTables(ctx)
@@ -50,8 +50,8 @@ func NewDatabaseStorage(ctx context.Context, c config.Config) (*DatabaseStorage,
 	return s, nil
 }
 
-func NewWorker() *Worker {
-	return &Worker{
+func newWorker() *worker {
+	return &worker{
 		input: make(chan model.URLBatchDelete),
 		done:  make(chan struct{}),
 	}
@@ -61,7 +61,7 @@ func (s *DatabaseStorage) Read(ctx context.Context, shortURL string) (string, er
 	readQuery := `SELECT url, deleted FROM urls WHERE short = $1`
 	row := s.conn.QueryRowContext(ctx, readQuery, shortURL)
 
-	var u URL
+	var u url
 
 	err := row.Scan(&u.longURL, &u.isDeleted)
 	if err == sql.ErrNoRows {
@@ -105,8 +105,6 @@ func (s *DatabaseStorage) GetAll() (map[string]URLEntry, error) {
 }
 
 func (s *DatabaseStorage) deleteURL(ctx context.Context, urls []model.URLBatchDelete) error {
-	fmt.Println("delete sql with ", len(urls), " rows")
-
 	tx, err := s.conn.Begin()
 	if err != nil {
 		return err
@@ -208,23 +206,15 @@ func NewInsertURLUniqError(shortURL string, err error) error {
 	}
 }
 
-func (w *Worker) pushBatchToDB(ctx context.Context, s *DatabaseStorage, c config.Config) {
-	flush := func() {
-		for {
-			time.Sleep(time.Duration(c.DeleteFlushTimeoutInSeconds) * time.Second)
-			w.done <- struct{}{}
-		}
-	}
-
-	go flush()
-
+func (w *worker) pushBatchToDB(ctx context.Context, s *DatabaseStorage, c config.Config) {
+	ticker := time.NewTicker(time.Duration(c.DeleteFlushTimeoutInSeconds) * time.Second)
 	buffer := make([]model.URLBatchDelete, c.DeleteBufferSize)
 
 	var i int
 
 	for {
 		select {
-		case <-w.done:
+		case <-ticker.C:
 			if i > 0 {
 				err := s.deleteURL(ctx, buffer[:i])
 				if err != nil {
