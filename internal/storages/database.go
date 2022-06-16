@@ -208,34 +208,32 @@ func NewInsertURLUniqError(shortURL string, err error) error {
 
 func (w *worker) pushBatchToDB(ctx context.Context, s *DatabaseStorage, c config.Config) {
 	ticker := time.NewTicker(time.Duration(c.DeleteFlushTimeoutInSeconds) * time.Second)
-	buffer := make([]model.URLBatchDelete, c.DeleteBufferSize)
 
-	var i int
+	var buffer []model.URLBatchDelete
 
 	for {
 		select {
 		case <-ticker.C:
-			if i > 0 {
-				err := s.deleteURL(ctx, buffer[:i])
+			if len(buffer) > 0 {
+				err := s.deleteURL(ctx, buffer)
 				if err != nil {
 					log.Println("", err)
 				}
-				i = 0
+				buffer = buffer[:0]
 			}
 		case u, ok := <-w.input:
 			if !ok {
 				return
 			}
 
-			buffer[i] = u
-			i++
+			buffer = append(buffer, u)
 
-			if i == len(buffer) {
+			if len(buffer) == c.DeleteBufferSize {
 				err := s.deleteURL(ctx, buffer)
 				if err != nil {
 					log.Println("", err)
 				}
-				i = 0
+				buffer = buffer[:0]
 			}
 		}
 	}
