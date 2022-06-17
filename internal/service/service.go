@@ -2,7 +2,9 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -46,14 +48,31 @@ func NewService(ctx context.Context) (*Service, error) {
 	}, nil
 }
 
-func (s *Service) Start() error {
+func (s *Service) Start(ctx context.Context, errCh chan error) {
 	h := handlers.NewHandler(s.Storage, s.Conf)
+	srv := &http.Server{Addr: s.Conf.ServerAddress, Handler: s.Router(h)}
 
-	err := http.ListenAndServe(s.Conf.ServerAddress, s.Router(h))
-	if err != nil {
-		return err
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			errCh <- err
+		}
+	}()
+
+	<-ctx.Done()
+
+	ctxTimeout, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+
+	defer func() {
+		cancel()
+	}()
+
+	srv.SetKeepAlivesEnabled(false)
+
+	if err := srv.Shutdown(ctxTimeout); err != nil {
+		errCh <- err
 	}
-	return nil
+
+	fmt.Println("Shutdown completed")
 }
 
 func (s *Service) Router(h *handlers.Handler) chi.Router {

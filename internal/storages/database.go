@@ -105,12 +105,20 @@ func (s *DatabaseStorage) GetAll() (map[string]URLEntry, error) {
 }
 
 func (s *DatabaseStorage) deleteURL(ctx context.Context, urls []model.URLBatchDelete) error {
-	tx, err := s.conn.Begin()
+	// Check ctx state (interrupted or alive)
+	fmt.Println("deleteURL context:", ctx)
+	// In any cases if <-ctx.Done() next line is the last which executed
+	// If ctx interrupted, err == context canceled, other case I get literally nothing
+	tx, err := s.conn.BeginTx(ctx, nil)
 	if err != nil {
+		fmt.Println("is deleteURL err:", err)
 		return err
 	}
 
-	stmt, err := tx.PrepareContext(ctx, `UPDATE urls SET deleted = true WHERE user_id = $1
+	// Check if execution process is right here
+	fmt.Println("deleteURL tx:", tx)
+
+	stmt, err := tx.Prepare(`UPDATE urls SET deleted = true WHERE user_id = $1
 									AND short = $2`)
 	if err != nil {
 		return err
@@ -207,34 +215,50 @@ func NewInsertURLUniqError(shortURL string, err error) error {
 }
 
 func (w *worker) pushBatchToDB(ctx context.Context, s *DatabaseStorage, c config.Config) {
-	ticker := time.NewTicker(time.Duration(c.DeleteFlushTimeoutInSeconds) * time.Second)
-
 	var buffer []model.URLBatchDelete
+	var ticker *time.Ticker
+	var tickCh <-chan time.Time
 
+	pusher := func(ctx context.Context) {
+		fmt.Println("buffer len:", len(buffer))
+
+		if len(buffer) > 0 {
+			err := s.deleteURL(ctx, buffer)
+			if err != nil {
+				log.Fatal(err)
+			}
+			buffer = buffer[:0]
+			ticker.Stop()
+
+			fmt.Println("do the work, or not")
+		}
+	}
+
+loop:
 	for {
 		select {
-		case <-ticker.C:
-			if len(buffer) > 0 {
-				err := s.deleteURL(ctx, buffer)
-				if err != nil {
-					log.Println("", err)
-				}
-				buffer = buffer[:0]
-			}
+		case <-ctx.Done():
+			ctx = context.Background()
+			pusher(ctx)
+			break loop
+		case <-tickCh:
 		case u, ok := <-w.input:
 			if !ok {
 				return
 			}
 
+			if len(buffer) == 0 {
+				ticker = time.NewTicker(time.Duration(c.DeleteFlushTimeoutInSeconds) * time.Second)
+				tickCh = ticker.C
+			}
+
 			buffer = append(buffer, u)
 
-			if len(buffer) == c.DeleteBufferSize {
-				err := s.deleteURL(ctx, buffer)
-				if err != nil {
-					log.Println("", err)
-				}
-				buffer = buffer[:0]
+			if len(buffer) != c.DeleteBufferSize {
+				continue
 			}
 		}
+
+		pusher(ctx)
 	}
 }
