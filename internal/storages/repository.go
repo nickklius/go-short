@@ -20,6 +20,5 @@ type Repository interface {
 	GetAll() (map[string]URLEntry, error)
 	GetAllByUserID(ctx context.Context, userID string) (map[string]string, error)
 	UpdateURLInBatchMode(ctx context.Context, userID string, urls []string)
-
 	Ping() error
 }

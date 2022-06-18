@@ -20,11 +20,14 @@ import (
 )
 
 var (
-	c config.Config
+	c  config.Config
+	ch chan struct{}
 )
 
 func TestMain(m *testing.M) {
 	c, _ = config.NewConfig()
+	ch = make(chan struct{})
+
 	os.Exit(m.Run())
 }
 
@@ -50,7 +53,7 @@ func testRequest(t *testing.T, ts *httptest.Server, method, path string, body io
 }
 
 func TestRetrieveHandler(t *testing.T) {
-	s := storages.NewMemoryStorage()
+	s := storages.NewMemoryStorage(context.TODO(), ch)
 	h := NewHandler(s, c)
 
 	if err := h.storage.Create(context.Background(), "5fbbd", "https://yandex.ru", ""); err != nil {
@@ -106,7 +109,7 @@ func TestRetrieveHandler(t *testing.T) {
 }
 
 func TestShortenHandler(t *testing.T) {
-	s := storages.NewMemoryStorage()
+	s := storages.NewMemoryStorage(context.TODO(), ch)
 	h := NewHandler(s, c)
 
 	type want struct {
@@ -151,7 +154,7 @@ func TestShortenHandler(t *testing.T) {
 }
 
 func TestShortenJsonHandler(t *testing.T) {
-	s := storages.NewMemoryStorage()
+	s := storages.NewMemoryStorage(context.TODO(), ch)
 	h := NewHandler(s, c)
 
 	type want struct {
