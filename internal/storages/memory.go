@@ -15,7 +15,12 @@ type MemoryStorage struct {
 	data map[string]URLEntry
 }
 
-func NewMemoryStorage() Repository {
+func NewMemoryStorage(ctx context.Context, closeServiceCh chan struct{}) Repository {
+	go func() {
+		<-ctx.Done()
+		closeServiceCh <- struct{}{}
+	}()
+
 	return &MemoryStorage{
 		data: make(map[string]URLEntry),
 	}

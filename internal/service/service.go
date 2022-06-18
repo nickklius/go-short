@@ -36,12 +36,12 @@ func NewService(ctx context.Context) (*Service, error) {
 			return nil, storages.ErrDBConnNotEstablished
 		}
 	case c.FileStoragePath != "":
-		s, err = storages.NewLocalStorage(ctx, c.FileStoragePath)
+		s, err = storages.NewLocalStorage(ctx, c.FileStoragePath, done)
 		if err != nil {
 			return nil, storages.ErrLocalStorageNotCreated
 		}
 	default:
-		s = storages.NewMemoryStorage()
+		s = storages.NewMemoryStorage(ctx, done)
 	}
 
 	return &Service{

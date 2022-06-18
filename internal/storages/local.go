@@ -20,8 +20,8 @@ type fileHandler struct {
 	decoder *json.Decoder
 }
 
-func NewLocalStorage(ctx context.Context, p string) (Repository, error) {
-	s := NewMemoryStorage()
+func NewLocalStorage(ctx context.Context, p string, closeServiceCh chan struct{}) (Repository, error) {
+	s := NewMemoryStorage(ctx, closeServiceCh)
 
 	f, err := NewFileHandler(p)
 	if err != nil {
