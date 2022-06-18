@@ -249,6 +249,28 @@ func (h *Handler) PingDB(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+func (h *Handler) DeleteURLs(w http.ResponseWriter, r *http.Request) {
+	var urls []string
+
+	userID, err := middleware.GetCurrentUserID(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	dec := json.NewDecoder(r.Body)
+	err = dec.Decode(&urls)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	go h.storage.UpdateURLInBatchMode(r.Context(), userID, urls)
+
+	w.WriteHeader(http.StatusAccepted)
+}
+
 func (h *Handler) prepareShortening(ctx context.Context, longURL, userID string) (string, error) {
 	var shortURL string
 
@@ -284,6 +306,8 @@ func errToStatus(err error) int {
 		return http.StatusInternalServerError
 	case storages.ErrNotFound:
 		return http.StatusNotFound
+	case storages.ErrURLIsDeleted:
+		return http.StatusGone
 	case storages.ErrAlreadyExists:
 		return http.StatusConflict
 	case storages.ErrMethodNotImplemented:

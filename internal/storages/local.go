@@ -20,8 +20,8 @@ type fileHandler struct {
 	decoder *json.Decoder
 }
 
-func NewLocalStorage(ctx context.Context, p string) (Repository, error) {
-	s := NewMemoryStorage()
+func NewLocalStorage(ctx context.Context, p string, closeServiceCh chan struct{}) (Repository, error) {
+	s := NewMemoryStorage(ctx, closeServiceCh)
 
 	f, err := NewFileHandler(p)
 	if err != nil {
@@ -77,6 +77,8 @@ func (s *LocalStorage) GetAllByUserID(ctx context.Context, userID string) (map[s
 func (s *LocalStorage) Ping() error {
 	return ErrMethodNotImplemented
 }
+
+func (s *LocalStorage) UpdateURLInBatchMode(_ context.Context, _ string, _ []string) {}
 
 func NewFileHandler(fileName string) (*fileHandler, error) {
 	file, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE, 0777)

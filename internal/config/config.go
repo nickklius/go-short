@@ -8,13 +8,15 @@ import (
 )
 
 type Config struct {
-	KeyLength         int    `env:"KEY_LENGTH" envDefault:"5"`
-	Letters           string `env:"LETTERS" envDefault:"0123456789abcdefghijklmnopqrstuvwxyz"`
-	ShortenerCapacity int    `env:"SHORTENER_CAPACITY" envDefault:"1"`
-	BaseURL           string `env:"BASE_URL" envDefault:"http://localhost:8080"`
-	ServerAddress     string `env:"SERVER_ADDRESS" envDefault:":8080"`
-	FileStoragePath   string `env:"FILE_STORAGE_PATH" envDefault:"storage.json"`
-	DatabaseDSN       string `env:"DATABASE_DSN"`
+	KeyLength                   int    `env:"KEY_LENGTH" envDefault:"5"`
+	Letters                     string `env:"LETTERS" envDefault:"0123456789abcdefghijklmnopqrstuvwxyz"`
+	ShortenerCapacity           int    `env:"SHORTENER_CAPACITY" envDefault:"1"`
+	BaseURL                     string `env:"BASE_URL" envDefault:"http://localhost:8080"`
+	ServerAddress               string `env:"SERVER_ADDRESS" envDefault:":8080"`
+	FileStoragePath             string `env:"FILE_STORAGE_PATH" envDefault:"storage.json"`
+	DatabaseDSN                 string `env:"DATABASE_DSN"`
+	DeleteBufferSize            int    `env:"DELETE_BUFFER_SIZE" envDefault:"5"`
+	DeleteFlushTimeoutInSeconds int    `env:"DELETE_FLUSH_TIMEOUT" envDefault:"5"`
 }
 
 func NewConfig() (Config, error) {

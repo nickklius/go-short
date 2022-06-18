@@ -3,18 +3,45 @@ package main
 import (
 	"context"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/nickklius/go-short/internal/service"
 )
 
 func main() {
-	s, err := service.NewService(context.Background())
-	if err != nil {
+	errCh := run()
+
+	if err := <-errCh; err != nil {
 		log.Fatal(err)
+	}
+}
+
+func run() <-chan error {
+	errCh := make(chan error, 1)
+
+	ctx, stop := signal.NotifyContext(context.Background(),
+		os.Interrupt,
+		syscall.SIGTERM,
+		syscall.SIGQUIT,
+	)
+
+	s, err := service.NewService(ctx)
+	if err != nil {
+		errCh <- err
 	}
 
-	err = s.Start()
-	if err != nil {
-		log.Fatal(err)
-	}
+	s.Start(ctx, errCh)
+
+	go func() {
+		<-ctx.Done()
+
+		defer func() {
+			stop()
+			close(errCh)
+		}()
+	}()
+
+	return errCh
 }
