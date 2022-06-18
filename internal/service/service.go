@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -17,19 +16,22 @@ import (
 type Service struct {
 	Storage storages.Repository
 	Conf    config.Config
+	done    chan struct{}
 }
 
 func NewService(ctx context.Context) (*Service, error) {
 	var s storages.Repository
 
 	c, err := config.NewConfig()
+	done := make(chan struct{})
+
 	if err != nil {
 		return nil, err
 	}
 
 	switch {
 	case c.DatabaseDSN != "":
-		s, err = storages.NewDatabaseStorage(ctx, c)
+		s, err = storages.NewDatabaseStorage(ctx, c, done)
 		if err != nil {
 			return nil, storages.ErrDBConnNotEstablished
 		}
@@ -45,6 +47,7 @@ func NewService(ctx context.Context) (*Service, error) {
 	return &Service{
 		Storage: s,
 		Conf:    c,
+		done:    done,
 	}, nil
 }
 
@@ -72,7 +75,7 @@ func (s *Service) Start(ctx context.Context, errCh chan error) {
 		errCh <- err
 	}
 
-	fmt.Println("Shutdown completed")
+	<-s.done
 }
 
 func (s *Service) Router(h *handlers.Handler) chi.Router {

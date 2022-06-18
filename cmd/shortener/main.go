@@ -27,6 +27,13 @@ func run() <-chan error {
 		syscall.SIGQUIT,
 	)
 
+	s, err := service.NewService(ctx)
+	if err != nil {
+		errCh <- err
+	}
+
+	s.Start(ctx, errCh)
+
 	go func() {
 		<-ctx.Done()
 
@@ -34,15 +41,7 @@ func run() <-chan error {
 			stop()
 			close(errCh)
 		}()
-
 	}()
-
-	s, err := service.NewService(ctx)
-	if err != nil {
-		errCh <- err
-	}
-
-	s.Start(ctx, errCh)
 
 	return errCh
 }

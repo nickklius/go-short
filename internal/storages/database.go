@@ -28,7 +28,7 @@ type url struct {
 	isDeleted bool
 }
 
-func NewDatabaseStorage(ctx context.Context, c config.Config) (*DatabaseStorage, error) {
+func NewDatabaseStorage(ctx context.Context, c config.Config, closeServiceCh chan struct{}) (*DatabaseStorage, error) {
 	db, err := sql.Open("pgx", c.DatabaseDSN)
 
 	if err != nil {
@@ -46,6 +46,11 @@ func NewDatabaseStorage(ctx context.Context, c config.Config) (*DatabaseStorage,
 	}
 
 	go s.worker.pushBatchToDB(ctx, s, c)
+
+	go func() {
+		<-s.worker.done
+		closeServiceCh <- struct{}{}
+	}()
 
 	return s, nil
 }
@@ -105,18 +110,10 @@ func (s *DatabaseStorage) GetAll() (map[string]URLEntry, error) {
 }
 
 func (s *DatabaseStorage) deleteURL(ctx context.Context, urls []model.URLBatchDelete) error {
-	// Check ctx state (interrupted or alive)
-	fmt.Println("deleteURL context:", ctx)
-	// In any cases if <-ctx.Done() next line is the last which executed
-	// If ctx interrupted, err == context canceled, other case I get literally nothing
 	tx, err := s.conn.BeginTx(ctx, nil)
 	if err != nil {
-		fmt.Println("is deleteURL err:", err)
 		return err
 	}
-
-	// Check if execution process is right here
-	fmt.Println("deleteURL tx:", tx)
 
 	stmt, err := tx.Prepare(`UPDATE urls SET deleted = true WHERE user_id = $1
 									AND short = $2`)
@@ -220,27 +217,22 @@ func (w *worker) pushBatchToDB(ctx context.Context, s *DatabaseStorage, c config
 	var tickCh <-chan time.Time
 
 	pusher := func(ctx context.Context) {
-		fmt.Println("buffer len:", len(buffer))
-
 		if len(buffer) > 0 {
-			err := s.deleteURL(ctx, buffer)
+			err := s.deleteURL(context.Background(), buffer)
 			if err != nil {
 				log.Fatal(err)
 			}
 			buffer = buffer[:0]
 			ticker.Stop()
-
-			fmt.Println("do the work, or not")
 		}
 	}
 
-loop:
 	for {
 		select {
 		case <-ctx.Done():
-			ctx = context.Background()
 			pusher(ctx)
-			break loop
+			w.done <- struct{}{}
+			return
 		case <-tickCh:
 		case u, ok := <-w.input:
 			if !ok {
